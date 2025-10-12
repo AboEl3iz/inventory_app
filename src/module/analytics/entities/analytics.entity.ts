@@ -1,1 +1,15 @@
-export class Analytics {}
+import { Entity, Column } from 'typeorm';
+import { BaseEntity } from 'src/entities/base.entity';
+
+@Entity('analytics')
+export class Analytics extends BaseEntity {
+  @Column()
+  metric: string;
+
+  @Column({ type: 'float' })
+  value: number;
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  recordedAt: Date;
+}
+
