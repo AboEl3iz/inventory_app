@@ -9,7 +9,7 @@ export class AuthController {
 
   @Post()
   create(@Body() createAuthDto: CreateAuthDto) {
-    return this.authService.create(createAuthDto);
+     this.authService.create(createAuthDto);
   }
 
   @Get()
