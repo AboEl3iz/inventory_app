@@ -1,6 +1,5 @@
 import { Entity, Column, ManyToOne } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { Supplier } from '../../suppliers/entities/supplier.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { User } from '../../users/entities/user.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 

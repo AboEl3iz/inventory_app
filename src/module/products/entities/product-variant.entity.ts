@@ -5,8 +5,7 @@ import {
   OneToMany,
   JoinColumn,
 } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { Product } from './product.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { Product } from './product.entity';
 import { ProductVariantValue } from './product-variant-value.entity';
 
 @Entity('product_variants')

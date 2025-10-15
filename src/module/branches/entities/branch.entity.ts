@@ -1,7 +1,6 @@
 import { Entity, Column, OneToMany } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { Inventory } from '../../inventory/entities/inventory.entity';
-import { User } from 'src/module/users/entities/user.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { Inventory } from '../../inventory/entities/inventory.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('branches')
 export class Branch extends BaseEntity {

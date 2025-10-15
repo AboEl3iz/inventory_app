@@ -1,6 +1,5 @@
 import { Entity, Column, ManyToOne } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { Product } from '../../products/entities/product.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { Product } from '../../products/entities/product.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 
 @Entity('inventory')

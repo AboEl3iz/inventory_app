@@ -5,8 +5,7 @@ import {
   OneToMany,
   JoinColumn,
 } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { Category } from '../../categories/entities/category.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { Category } from '../../categories/entities/category.entity';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { ProductVariant } from './product-variant.entity';
 import { ProductAttributeValue } from './product-attribute-value.entity';

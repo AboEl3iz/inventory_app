@@ -1,6 +1,5 @@
 import { Entity, Column, ManyToOne } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { User } from '../../users/entities/user.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { User } from '../../users/entities/user.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 
 @Entity('invoices')

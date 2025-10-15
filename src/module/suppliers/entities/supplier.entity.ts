@@ -1,6 +1,5 @@
 import { Entity, Column, OneToMany } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { Product } from '../../products/entities/product.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { Product } from '../../products/entities/product.entity';
 import { Purchase } from '../../purchases/entities/purchase.entity';
 
 @Entity('suppliers')

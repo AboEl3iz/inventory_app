@@ -3,8 +3,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { ProductVariant } from './product-variant.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { ProductVariant } from './product-variant.entity';
 import { ProductAttributeValue } from './product-attribute-value.entity';
 
 @Entity('product_variant_values')

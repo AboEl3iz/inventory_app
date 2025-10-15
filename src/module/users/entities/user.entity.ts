@@ -1,9 +1,8 @@
 import { Entity, Column, OneToMany, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
-import { BaseEntity } from 'src/entities/base.entity';
-import { Invoice } from '../../invoices/entities/invoice.entity';
+import { BaseEntity } from '../../../entities/base.entity';import { Invoice } from '../../invoices/entities/invoice.entity';
 import { Purchase } from '../../purchases/entities/purchase.entity';
-import { Branch } from 'src/module/branches/entities/branch.entity';
-import { Auth } from 'src/module/auth/entities/auth.entity';
+import { Branch } from '../../branches/entities/branch.entity';
+import { Auth } from '../../auth/entities/auth.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
