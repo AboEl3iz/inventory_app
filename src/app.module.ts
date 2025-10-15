@@ -21,8 +21,25 @@ import { BranchesModule } from './module/branches/branches.module';
 import { ProductsModule } from './module/products/products.module';
 import { JWTConfig } from './config/jwt.config';
 import { JwtModule } from '@nestjs/jwt';
+import { WinstonModule } from 'nest-winston';
+import * as winston from 'winston';
 @Module({
   imports: [
+
+    WinstonModule.forRoot({
+      transports: [
+        new winston.transports.Console({
+          level: 'debug',
+          format: winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.colorize(),
+            winston.format.simple(),
+          ),
+        }),
+      ],
+    }),
+
+    // LoggerModule,
     ProductsModule,
     BranchesModule,
     EventsModule,
@@ -47,7 +64,7 @@ import { JwtModule } from '@nestjs/jwt';
         await typeOrmconfig(configService),
       inject: [ConfigService],
     }),
-    
+
 
   ],
   controllers: [AppController],

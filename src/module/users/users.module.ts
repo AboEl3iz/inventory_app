@@ -8,11 +8,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JWTConfig } from 'src/config/jwt.config';
 import { AuthModule } from '../auth/auth.module';
 import { Auth } from '../auth/entities/auth.entity';
+import { Logger } from 'winston';
+import { WinstonModule } from 'nest-winston';
 
 @Module({
   controllers: [UsersController],
   providers: [UsersService],
   imports: [
+    WinstonModule,
     AuthModule,
     TypeOrmModule.forFeature([User , Auth]),
     JwtModule.registerAsync({

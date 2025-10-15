@@ -17,7 +17,7 @@ export class User extends BaseEntity {
   password: string;
 
   
-  @OneToOne(() => Auth, auth => auth.user)
+  @OneToOne(() => Auth, auth => auth.user , { cascade: true })
   reftoken: string;
   @ManyToOne(() => Branch, branch => branch.users)
   @JoinColumn({ name: 'branchId' })

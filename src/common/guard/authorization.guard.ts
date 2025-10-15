@@ -1,15 +1,18 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from "@nestjs/common";
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Inject } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { Logger as WinstonLogger } from 'winston';
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
-  constructor(private reflector: Reflector) { }
+  constructor(private reflector: Reflector,
+     @Inject(WINSTON_MODULE_NEST_PROVIDER)
+    private readonly logger: WinstonLogger,
+  ) { }
 
   canActivate(context: ExecutionContext): boolean {
     const methodRoles = this.reflector.get<string[]>('roles', context.getHandler()) || [];
     const classRoles = this.reflector.get<string[]>('roles', context.getClass()) || [];
-    console.log('Method metadata:', this.reflector.get<string[]>('roles', context.getHandler()));
-    console.log('Class metadata:', this.reflector.get<string[]>('roles', context.getClass()));
+    
 
     // الأولوية للميثود
     const roles = methodRoles.length > 0 ? methodRoles : classRoles;
@@ -17,8 +20,7 @@ export class AuthorizationGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    console.log('User role:', user.role);
-    console.log('Required roles:', roles);
+    
 
     if (!roles || roles.length === 0) {
       return true;
