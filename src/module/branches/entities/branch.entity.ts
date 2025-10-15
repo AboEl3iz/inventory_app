@@ -4,7 +4,7 @@ import { User } from '../../users/entities/user.entity';
 
 @Entity('branches')
 export class Branch extends BaseEntity {
-  @Column()
+  @Column({unique: true })
   name: string;
 
   @Column()

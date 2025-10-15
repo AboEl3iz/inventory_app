@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.1.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.0.1",
@@ -69,7 +70,7 @@
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.7.3",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0"
   },
   "jest": {
@@ -92,8 +93,8 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "./coverage",
-     "transformIgnorePatterns": [
-    "node_modules/(?!uuid)"
-  ]
+    "transformIgnorePatterns": [
+      "node_modules/(?!uuid)"
+    ]
   }
 }
