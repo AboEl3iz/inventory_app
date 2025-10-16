@@ -156,7 +156,7 @@ export class UsersService {
     return uuidv4();
   }
 
-  private async generateTokens(user: User) {
+   async generateTokens(user: User) {
     const accesstoken = await this.generateToken(user!);
     const refreshtoken = this.generateRefreshToken();
     let oldRefreshToken = await this.authRepository.findOne({ where: { user: { id: user.id } } });
