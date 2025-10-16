@@ -4,7 +4,7 @@ import { Purchase } from '../../purchases/entities/purchase.entity';
 
 @Entity('suppliers')
 export class Supplier extends BaseEntity {
-  @Column()
+  @Column({unique: true})
   name: string;
 
   @Column()
