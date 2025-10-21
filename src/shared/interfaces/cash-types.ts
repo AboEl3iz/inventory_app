@@ -3,3 +3,4 @@ export interface IAppCache {
   set(key: string, value: any, ttl?: number): Promise<void>;
   del(key: string): Promise<void>;
 }
+
