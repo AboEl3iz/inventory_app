@@ -16,6 +16,7 @@ import { CreateVariantDto } from './dto/create-variant.dto';
 import { CreateProductAttributeValueDto } from './dto/create-product-attribute-value.dto';
 import { UpdateVariantDto } from './dto/update-variant.dto';
 import { CreateProductAttributeDto } from './dto/create-product-attribute.dto';
+import { IFilterProducts, IGetVariantResponse, ILinkedVariant, IStats, IVariant } from 'src/shared/interfaces/product-response';
 @Injectable()
 export class ProductsService {
 
@@ -41,7 +42,7 @@ export class ProductsService {
   }
 
   // ------------------ PRODUCTS CRUD ------------------
-  async create(dto: CreateProductDto) {
+  async create(dto: CreateProductDto): Promise<Product> {
     const category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
     if (!category) throw new NotFoundException('Category not found');
     const supplier = await this.supplierRepo.findOneBy({ id: dto.supplierId });
@@ -61,7 +62,7 @@ export class ProductsService {
     return saved;
   }
 
-  async findAll(page = 1, limit = 20, search?: string, categoryId?: string) {
+  async findAll(page = 1, limit = 20, search?: string, categoryId?: string) : Promise<IFilterProducts> {
     // normalize inputs
     page = Number(page) || 1;
     limit = Math.min(Number(limit) || 20, 100);
@@ -85,7 +86,7 @@ export class ProductsService {
     return result;
   }
 
-  async flatList() {
+  async flatList(): Promise<Product[]> {
     const cacheKey = 'products_flat';
     const cached = await this.cache.get<Product[]>(cacheKey);
     if (cached) return cached;
@@ -94,7 +95,7 @@ export class ProductsService {
     return list;
   }
 
-  async findOne(id: string) {
+  async findOne(id: string): Promise<Product> {
     const cacheKey = `product_${id}`;
     const cached = await this.cache.get<Product>(cacheKey);
     if (cached) return cached;
@@ -115,7 +116,7 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, dto: UpdateProductDto) {
+  async update(id: string, dto: UpdateProductDto) : Promise<Product> {
     const product = await this.productRepo.findOneBy({ id });
     if (!product) throw new NotFoundException('Product not found');
     Object.assign(product, dto);
@@ -124,7 +125,7 @@ export class ProductsService {
     return updated;
   }
 
-  async remove(id: string) {
+  async remove(id: string) : Promise<{ message: string }> {
     const product = await this.productRepo.findOneBy({ id });
     if (!product) throw new NotFoundException('Product not found');
     await this.productRepo.softRemove(product);
@@ -132,14 +133,14 @@ export class ProductsService {
     return { message: 'Product soft deleted' };
   }
 
-  async restore(id: string) {
+  async restore(id: string): Promise<{ message: string }> {
     await this.productRepo.restore(id);
     await this.invalidateProductCaches(id);
     return { message: 'Product restored' };
   }
 
   // ------------------ SEARCH / STATS / FILTER ------------------
-  async search(name: string) {
+  async search(name: string) : Promise<Product[]> {
     if (!name) return [];
     return this.productRepo.find({
       where: { name: ILike(`%${name}%`) },
@@ -147,7 +148,7 @@ export class ProductsService {
     });
   }
 
-  async findByCategory(categoryId: string) {
+  async findByCategory(categoryId: string) : Promise<Product[]> {
     const cacheKey = `products_category_${categoryId}`;
     const cached = await this.cache.get<Product[]>(cacheKey);
     if (cached) return cached;
@@ -160,9 +161,9 @@ export class ProductsService {
     return data;
   }
 
-  async stats() {
+  async stats() : Promise<IStats[]> {
     const cacheKey = 'product_stats';
-    const cached = await this.cache.get(cacheKey);
+    const cached  = await this.cache.get(cacheKey) as IStats[];
     if (cached) return cached;
 
     // use lower-case alias to avoid Postgres alias issues
@@ -190,7 +191,7 @@ export class ProductsService {
 
   // ------------------ VARIANTS ------------------
   // addVariants: accepts bulk array to reduce endpoints
-  async addVariants(productId: string, dtos: CreateVariantDto[]) {
+  async addVariants(productId: string, dtos: CreateVariantDto[]) : Promise<ProductVariant[]> {
     const product = await this.productRepo.findOneBy({ id: productId });
     if (!product) throw new NotFoundException('Product not found');
 
@@ -200,7 +201,7 @@ export class ProductsService {
     return saved;
   }
 
-  async getVariants(productId: string) {
+  async getVariants(productId: string) : Promise<IVariant[]> {
     const variants = await this.variantRepo.find({
       where: { product: { id: productId } },
       relations: [
@@ -237,6 +238,7 @@ export class ProductsService {
       return {
         id: variant.id,
         sku: variant.sku,
+        price: variant.price,
         BasePrice: variant.product.basePrice,
         costPrice: variant.costPrice,
         stockQuantity: variant.stockQuantity,
@@ -249,7 +251,7 @@ export class ProductsService {
   }
 
 
-  async updateVariant(variantId: string, dto: UpdateVariantDto) {
+  async updateVariant(variantId: string, dto: UpdateVariantDto) : Promise<IVariant> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: [
@@ -294,6 +296,7 @@ export class ProductsService {
       id: saved.id,
       sku: saved.sku,
       price: saved.price,
+      BasePrice: saved.product.basePrice,
       costPrice: saved.costPrice,
       stockQuantity: saved.stockQuantity,
       isActive: saved.isActive,
@@ -302,7 +305,7 @@ export class ProductsService {
   }
 
 
-  async deleteVariant(variantId: string) {
+  async deleteVariant(variantId: string): Promise<{ message: string }> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product'],
@@ -314,7 +317,7 @@ export class ProductsService {
   }
 
   // ------------------ ATTRIBUTE VALUES (product-scoped) ------------------
-  async addAttributeValue(productId: string, dto: CreateProductAttributeValueDto) {
+  async addAttributeValue(productId: string, dto: CreateProductAttributeValueDto) : Promise<ProductAttributeValue> {
     const product = await this.productRepo.findOneBy({ id: productId });
     if (!product) throw new NotFoundException('Product not found');
 
@@ -331,20 +334,20 @@ export class ProductsService {
     return saved;
   }
 
-  async getAttributes(productId: string) {
+  async getAttributes(productId: string) : Promise<ProductAttributeValue[]> {
     return this.attrValueRepo.find({
       where: { product: { id: productId } },
       relations: ['attribute'],
     });
   }
-  async getAttributesByCategory(categorytId: string) {
+  async getAttributesByCategory(categorytId: string) : Promise<ProductAttribute[]> {
     return this.attributeRepo.find({
       where: { category: { id: categorytId } },
       relations: ['values', 'category'],
     });
   }
   // product.service.ts
-  async addAttribute(dto: CreateProductAttributeDto) {
+  async addAttribute(dto: CreateProductAttributeDto) : Promise<ProductAttribute> {
     const category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
     if (!category) throw new NotFoundException('Category not found');
 
@@ -365,7 +368,7 @@ export class ProductsService {
 
 
   // ------------------ VARIANT <-> ATTRIBUTE VALUE LINKING ------------------
-  async linkVariantValues(variantId: string, valueIds: string[]) {
+  async linkVariantValues(variantId: string, valueIds: string[]) : Promise<ILinkedVariant> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product'],
@@ -411,11 +414,11 @@ export class ProductsService {
   }
 
 
-  async getVariantValues(variantId: string) {
+  async getVariantValues(variantId: string) : Promise<IGetVariantResponse> {
     const cacheKey = `variant_values_${variantId}`;
 
     // نحاول نجيب من الكاش الأول
-    const cached = await this.cache.get(cacheKey);
+    const cached  = await this.cache.get(cacheKey) as IGetVariantResponse;
     if (cached) return cached;
 
     const variantValues = await this.variantValueRepo.find({
@@ -450,7 +453,6 @@ export class ProductsService {
       });
     }
 
-    // الشكل النهائي للـ output
     const result = {
       variantId: variantId,
       sku: variantValues[0].variant.sku,
@@ -458,7 +460,6 @@ export class ProductsService {
       attributes: Object.values(grouped),
     };
 
-    // نخزّن النتيجة في الكاش لمدة 5 دقايق
     await this.cache.set(cacheKey, result, 1000 * 60 * 5);
 
     return result;
