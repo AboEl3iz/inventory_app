@@ -4,36 +4,51 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { BaseEntity } from '../../../entities/base.entity';import { Product } from './product.entity';
 import { ProductVariantValue } from './product-variant-value.entity';
+import { Inventory } from 'src/module/inventory/entities/inventory.entity';
+import { InvoiceItem } from 'src/module/invoices/entities/invoice_items.entity';
+import { PurchaseItem } from 'src/module/purchases/entities/purchase-item.entity';
+import { StockMovement } from 'src/module/stock/entities/stock.entity';
 
 @Entity('product_variants')
+@Index(['sku'], { unique: true })
 export class ProductVariant extends BaseEntity {
-  @Column()
+  @Column({ unique: true })
   sku: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, unique: true })
   barcode?: string;
 
-  @Column({ type: 'decimal', precision: 8, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
-  @Column({ name: 'cost_price', type: 'decimal', precision: 8, scale: 2 })
+  @Column({ name: 'cost_price', type: 'decimal', precision: 10, scale: 2 })
   costPrice: number;
 
-  @Column({ name: 'stock_quantity', type: 'smallint' })
-  stockQuantity: number;
-
-  @Column({ name: 'is_active', default: false })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
-  @ManyToOne(() => Product, (product) => product.variants, {
+  @ManyToOne(() => Product, product => product.variants, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'product_id' })
+  @JoinColumn({ name: 'productId' })
   product: Product;
 
-  @OneToMany(() => ProductVariantValue, (value) => value.variant)
+  @OneToMany(() => ProductVariantValue, value => value.variant, { cascade: true })
   values: ProductVariantValue[];
+
+  @OneToMany(() => Inventory, inventory => inventory.variant)
+  inventories: Inventory[];
+
+  @OneToMany(() => InvoiceItem, item => item.variant)
+  invoiceItems: InvoiceItem[];
+
+  @OneToMany(() => PurchaseItem, item => item.variant)
+  purchaseItems: PurchaseItem[];
+
+  @OneToMany(() => StockMovement, movement => movement.variant)
+  stockMovements: StockMovement[];
 }

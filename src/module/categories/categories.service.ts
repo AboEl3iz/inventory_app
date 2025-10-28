@@ -72,7 +72,16 @@ export class CategoriesService {
     const category = await this.categoryRepo.findOne({ where: { id } });
     if (!category) throw new NotFoundException('Category not found');
 
-    Object.assign(category, dto);
+    if (dto.name) category.name = dto.name;
+
+    if (dto.parentId){
+      if (dto.parentId === id) {
+        throw new NotFoundException('Category cannot be its own parent');
+      }
+      const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+      if (!parent) throw new NotFoundException('Parent category not found');
+      category.parent = parent;
+    }
     await this.cacheManager.del('categories_tree');
     return await this.categoryRepo.save(category);
   }

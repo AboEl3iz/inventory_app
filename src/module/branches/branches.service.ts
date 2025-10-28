@@ -9,6 +9,8 @@ import { Inventory } from '../inventory/entities/inventory.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
+import { Invoice } from '../invoices/entities/invoice.entity';
+import { Role } from 'src/common/decorator/roles.decorator';
 
 @Injectable()
 export class BranchesService {
@@ -20,16 +22,17 @@ export class BranchesService {
     @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
     @InjectRepository(User) private userRepository: Repository<User>,
+    @InjectRepository(Invoice) private invoiceRepository: Repository<Invoice>,
 
   ) { }
-  async create(createBranchDto: CreateBranchDto , userId : string): Promise<IBranchResponse> {
+  async create(createBranchDto: CreateBranchDto, userId: string): Promise<IBranchResponse> {
+    
     if (await this.branchrepo.findOne({ where: { name: createBranchDto.name } })) {
       throw new BadRequestException('Branch name already exists');
     }
 
     const branch = await this.branchrepo.create(createBranchDto);
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    branch.users.push(user!);
+   
     await this.branchrepo.save(branch);
     return {
       id: branch.id,
@@ -49,56 +52,94 @@ export class BranchesService {
     }));
   }
 
-  async getBranchStats(branchId: string , managerId : string) : Promise<IBranchStatsResponse> {
-    const branch = await this.branchrepo.findOne({ where: { id: branchId } });
-    if (!branch) throw new NotFoundException('Branch not found');
+  async getBranchStats(branchId: string, managerpayload: any) {
+    // Validate branch exists and manager has access
+    const branch = await this.branchrepo.findOne({
+      where: { id: branchId },
+      relations: ['users']
+    });
 
+    if (!branch) {
+      throw new NotFoundException('Branch not found');
+    }
+
+    // Verify manager has access to this branch
+    const manager = await this.userRepository.findOne({
+      where: { id: managerpayload.id },
+      relations: ['branch']
+    });
+    console.debug(`Manager branch ID: ${manager?.branch?.id}, Requested branch ID: ${branchId} and his role is ${managerpayload.role}`);
+
+    if ( (managerpayload.role !== "admin") && (manager!.branch?.id === branchId)) {
+      throw new ForbiddenException('You do not have access to this branch');
+    }
+
+    // Get inventories with correct relations (variant -> product)
     const inventories = await this.inventoryRepository.find({
       where: { branch: { id: branchId } },
-      relations: ['product'],
+      relations: ['variant', 'variant.product'], // Fixed: variant instead of product
     });
 
     const productStats: {
       productId: string;
-      name: string;
+      variantId: string;
+      productName: string;
+      variantSku: string;
       quantity: number;
       minThreshold: number;
       thresholdPassed: boolean;
       sellingPrice: number;
       costPrice: number;
-      profit: number;
+      potentialProfit: number;
       profitMargin: string;
-
     }[] = [];
-    let totalProfit = 0;
-    let totalLoss = 0;
+
+    let totalPotentialProfit = 0;
+    let totalPotentialLoss = 0;
+    let totalInventoryValue = 0;
+    let totalInventoryCost = 0;
 
     for (const inv of inventories) {
-      const product = inv.product;
+      const variant = inv.variant;
+      const product = variant.product;
 
-      const sellingPrice = product.basePrice;
-      const costPrice = await this.getAverageCostPrice(product.id);
+      // Use variant's actual selling price, not product base price
+      const sellingPrice = Number(variant.price);
+      const costPrice = Number(variant.costPrice);
 
-      const profit = (sellingPrice - costPrice) * inv.quantity;
-      const profitMargin =
-        costPrice !== 0 ? ((sellingPrice - costPrice) / costPrice) * 100 : 0;
+      // Calculate potential profit (not actual profit - that comes from sales)
+      const potentialProfit = (sellingPrice - costPrice) * inv.quantity;
+      const profitMargin = costPrice !== 0
+        ? ((sellingPrice - costPrice) / costPrice) * 100
+        : 0;
 
-      if (profit >= 0) totalProfit += profit;
-      else totalLoss += profit;
+      // Calculate inventory values
+      totalInventoryValue += sellingPrice * inv.quantity;
+      totalInventoryCost += costPrice * inv.quantity;
+
+      if (potentialProfit >= 0) {
+        totalPotentialProfit += potentialProfit;
+      } else {
+        totalPotentialLoss += Math.abs(potentialProfit);
+      }
 
       productStats.push({
         productId: product.id,
-        name: product.name,
+        variantId: variant.id,
+        productName: product.name,
+        variantSku: variant.sku,
         quantity: inv.quantity,
         minThreshold: inv.minThreshold,
         thresholdPassed: inv.quantity < inv.minThreshold,
         sellingPrice,
         costPrice,
-        profit,
+        potentialProfit,
         profitMargin: profitMargin.toFixed(2) + '%',
       });
     }
 
+    // Get actual sales profit for the branch
+    const actualProfit = await this.getActualBranchProfit(branchId);
 
     return {
       branch: {
@@ -108,9 +149,12 @@ export class BranchesService {
         phone: branch.phone,
       },
       summary: {
-        totalProducts: inventories.length,
-        totalProfit,
-        totalLoss,
+        totalVariants: inventories.length,
+        totalInventoryValue: Number(totalInventoryValue.toFixed(2)),
+        totalInventoryCost: Number(totalInventoryCost.toFixed(2)),
+        potentialProfit: Number(totalPotentialProfit.toFixed(2)),
+        potentialLoss: Number(totalPotentialLoss.toFixed(2)),
+        actualProfit: Number(actualProfit.toFixed(2)),
         lowStockCount: productStats.filter(p => p.thresholdPassed).length,
       },
       products: productStats,
@@ -147,6 +191,9 @@ export class BranchesService {
     if (updateBranchDto.phone) {
       branch.phone = updateBranchDto.phone;
     }
+    if (updateBranchDto.isActive !== undefined) {
+      branch.isActive = updateBranchDto.isActive;
+    }
     await this.branchrepo.save(branch);
     return {
       id: branch.id,
@@ -165,15 +212,50 @@ export class BranchesService {
     return 'Branch removed successfully';
   }
 
-  private async getAverageCostPrice(productId: string): Promise<number> {
-    const variants = await this.variantRepository.find({
-      where: { product: { id: productId } },
+  private async getActualBranchProfit(branchId: string): Promise<number> {
+    const invoices = await this.invoiceRepository.find({
+      where: {
+        branch: { id: branchId },
+        status: 'paid' // Only count paid invoices
+      },
+      relations: ['items', 'items.variant'],
     });
 
-    if (!variants.length) return 0;
+    let totalProfit = 0;
 
-    const avgCost =
-      variants.reduce((sum, v) => sum + Number(v.costPrice), 0) / variants.length;
-    return +avgCost.toFixed(2);
+    for (const invoice of invoices) {
+      for (const item of invoice.items) {
+        const sellingPrice = Number(item.unitPrice);
+        const costPrice = Number(item.variant.costPrice);
+        const profit = (sellingPrice - costPrice) * item.quantity;
+        totalProfit += profit;
+      }
+    }
+
+    return totalProfit;
+  }
+
+  async assignUserToBranch(branchId: string, userId: string, role: Role) {
+    const branch = await this.branchrepo.findOne({
+      where: { id: branchId },
+      relations: ['users'],
+    });
+    if (!branch) throw new NotFoundException('Branch not found');
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.role !== role)
+      throw new BadRequestException(`User is not a ${role}`);
+
+    user.branch = branch;
+    await this.userRepository.save(user);
+
+    return {
+      message: `${role} assigned to branch successfully`,
+      branchId: branch.id,
+      userId: user.id,
+      role: user.role,
+    };
   }
 }

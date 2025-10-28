@@ -13,12 +13,12 @@ export class ProductAttribute extends BaseEntity {
   @Column()
   name: string;
 
-  @ManyToOne(() => Category, (category) => category.products, {
+  @ManyToOne(() => Category, category => category.attributes, {
     onDelete: 'SET NULL',
   })
-  @JoinColumn({ name: 'category_id' })
+  @JoinColumn({ name: 'categoryId' })
   category: Category;
 
-  @OneToMany(() => ProductAttributeValue, (value) => value.attribute)
+  @OneToMany(() => ProductAttributeValue, value => value.attribute)
   values: ProductAttributeValue[];
 }

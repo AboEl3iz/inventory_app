@@ -9,39 +9,46 @@ import { BaseEntity } from '../../../entities/base.entity';import { Category } f
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { ProductVariant } from './product-variant.entity';
 import { ProductAttributeValue } from './product-attribute-value.entity';
+import { ProductImage } from './product-images.entity';
 
 @Entity('products')
 export class Product extends BaseEntity {
   @Column()
   name: string;
 
-  @Column()
+  @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column()
   brand: string;
 
-  @Column({ name: 'base_price', type: 'float' })
+  @Column({ name: 'base_price', type: 'decimal', precision: 10, scale: 2 })
   basePrice: number;
 
-  @Column({ name: 'is_active', default: false })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
-  @ManyToOne(() => Category, (category) => category.products, {
+  @Column({ type: 'text', nullable: true })
+  imageUrl: string;
+
+  @ManyToOne(() => Category, category => category.products, {
     onDelete: 'SET NULL',
   })
-  @JoinColumn({ name: 'category_id' })
+  @JoinColumn({ name: 'categoryId' })
   category: Category;
 
-  @ManyToOne(() => Supplier, (supplier) => supplier.products, {
+  @ManyToOne(() => Supplier, supplier => supplier.products, {
     onDelete: 'SET NULL',
   })
-  @JoinColumn({ name: 'supplier_id' })
+  @JoinColumn({ name: 'supplierId' })
   supplier: Supplier;
 
-  @OneToMany(() => ProductVariant, (variant) => variant.product)
+  @OneToMany(() => ProductVariant, variant => variant.product, { cascade: true })
   variants: ProductVariant[];
 
-  @OneToMany(() => ProductAttributeValue, (value) => value.product)
+  @OneToMany(() => ProductAttributeValue, value => value.product)
   attributeValues: ProductAttributeValue[];
+
+  @OneToMany(() => ProductImage, image => image.product, { cascade: true })
+  images: ProductImage[];
 }

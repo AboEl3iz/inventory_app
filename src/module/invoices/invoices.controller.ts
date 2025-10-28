@@ -1,34 +1,69 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { Roles, Role } from 'src/common/decorator/roles.decorator';
+import { AuthenticationGuard } from 'src/common/guard/authentication.guard';
+import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
 
 @Controller('invoices')
+@UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class InvoicesController {
-  constructor(private readonly invoicesService: InvoicesService) {}
+  constructor(private readonly invoiceService: InvoicesService) {}
 
+  /**
+   * 🟢 Create a new invoice
+   */
   @Post()
-  create(@Body() createInvoiceDto: CreateInvoiceDto) {
-    return this.invoicesService.create(createInvoiceDto);
+  @Roles(Role.admin, Role.manager, Role.cashier)
+  create(@Body() dto: CreateInvoiceDto, @Req() req) {
+    // user ID and branch come from JWT, not request body
+    return this.invoiceService.createInvoice({
+      ...dto,
+      userId: req.user.id,
+      branchId: req.user.branchId,
+    });
   }
 
+  /**
+   * 🟢 Get all invoices (filtered by role)
+   */
   @Get()
-  findAll() {
-    return this.invoicesService.findAll();
+  @Roles(Role.admin, Role.manager, Role.cashier)
+  async getAll(
+    @Req() req,
+    @Query('branchId') branchId?: string,
+    @Query('status') status?: string,
+    @Query('limit') limit = 20,
+    @Query('page') page = 1,
+  ) {
+    return this.invoiceService.getAll(req.user, branchId, status, limit, page);
   }
 
+  /**
+   * 🟢 Get one invoice
+   */
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.invoicesService.findOne(+id);
+  @Roles(Role.admin, Role.manager, Role.cashier)
+  async getOne(@Param('id') id: string, @Req() req) {
+    return this.invoiceService.getOne(id, req.user);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateInvoiceDto: UpdateInvoiceDto) {
-    return this.invoicesService.update(+id, updateInvoiceDto);
-  }
-
+  /**
+   * 🔴 Cancel invoice
+   */
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.invoicesService.remove(+id);
+  @Roles(Role.admin, Role.manager)
+  async cancelInvoice(@Param('id') id: string, @Req() req) {
+    return this.invoiceService.cancelInvoice(id, req.user);
+  }
+
+  /**
+   * 📊 Get revenue stats for branch
+   */
+  @Get('branch/:branchId/stats')
+  @Roles(Role.admin, Role.manager)
+  async getBranchStats(@Param('branchId') branchId: string, @Req() req) {
+    return this.invoiceService.getBranchStats(branchId, req.user);
   }
 }

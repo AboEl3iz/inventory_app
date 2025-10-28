@@ -24,4 +24,6 @@ export class CreateProductDto {
   @IsUUID()
   @IsOptional()
   supplierId?: string;
+ @IsOptional()
+  imageUrl?: string;
 }

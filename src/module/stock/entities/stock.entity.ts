@@ -1,18 +1,41 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../entities/base.entity';import { Branch } from '../../branches/entities/branch.entity';
 import { Product } from '../../products/entities/product.entity';
+import { ProductVariant } from 'src/module/products/entities/product-variant.entity';
+import { User } from 'src/module/users/entities/user.entity';
 
-@Entity('stock')
-export class Stock extends BaseEntity {
-  @ManyToOne(() => Branch)
+@Entity('stock_movements')
+export class StockMovement extends BaseEntity {
+  @ManyToOne(() => ProductVariant, variant => variant.stockMovements)
+  @JoinColumn({ name: 'variantId' })
+  variant: ProductVariant;
+
+  @ManyToOne(() => Branch, branch => branch.stockMovements)
+  @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
-  @ManyToOne(() => Product)
-  product: Product;
+  @Column()
+  type: 'sale' | 'purchase' | 'adjustment' | 'return' | 'transfer' | 'damage';
 
   @Column({ type: 'int' })
-  quantity: number;
+  quantityChange: number;
 
-  @Column({ default: 'IN' })
-  type: string;
+  @Column({ type: 'int' })
+  quantityBefore: number;
+
+  @Column({ type: 'int' })
+  quantityAfter: number;
+
+  @Column({ nullable: true })
+  referenceType: string; // 'invoice', 'purchase', 'manual'
+
+  @Column({ nullable: true })
+  referenceId: string;
+
+  @ManyToOne(() => User, user => user.stockMovements)
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
 }

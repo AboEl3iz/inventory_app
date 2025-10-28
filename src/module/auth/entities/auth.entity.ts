@@ -4,7 +4,7 @@ import { join } from 'path';
 
 @Entity('auth')
 export class Auth extends BaseEntity {
-  @OneToOne(() => User ,{onDelete: 'CASCADE'})
+  @OneToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
 

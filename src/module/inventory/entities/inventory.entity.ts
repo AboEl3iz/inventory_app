@@ -1,18 +1,28 @@
-import { Entity, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne, Index, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../entities/base.entity';import { Product } from '../../products/entities/product.entity';
 import { Branch } from '../../branches/entities/branch.entity';
+import { ProductVariant } from 'src/module/products/entities/product-variant.entity';
 
 @Entity('inventory')
+@Index(['variant', 'branch'], { unique: true })
 export class Inventory extends BaseEntity {
-  @ManyToOne(() => Product)
-  product: Product;
+  @ManyToOne(() => ProductVariant, variant => variant.inventories)
+  @JoinColumn({ name: 'variantId' })
+  variant: ProductVariant;
 
-  @ManyToOne(() => Branch)
+  @ManyToOne(() => Branch, branch => branch.inventories)
+  @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', default: 0 })
   quantity: number;
 
   @Column({ type: 'int', default: 0 })
   minThreshold: number;
+
+  @Column({ default: false })
+  lowStockAlertSent: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastAlertSentAt: Date;
 }

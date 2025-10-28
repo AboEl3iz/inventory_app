@@ -14,18 +14,18 @@ export class ProductAttributeValue extends BaseEntity {
   @Column()
   value: string;
 
-  @ManyToOne(() => ProductAttribute, (attr) => attr.values, {
+  @ManyToOne(() => ProductAttribute, attr => attr.values, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'attribute_id' })
+  @JoinColumn({ name: 'attributeId' })
   attribute: ProductAttribute;
 
-  @ManyToOne(() => Product, (product) => product.attributeValues, {
+  @ManyToOne(() => Product, product => product.attributeValues, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'product_id' })
+  @JoinColumn({ name: 'productId' })
   product: Product;
 
-  @OneToMany(() => ProductVariantValue, (vv) => vv.attributeValue)
+  @OneToMany(() => ProductVariantValue, vv => vv.attributeValue)
   variantValues: ProductVariantValue[];
 }

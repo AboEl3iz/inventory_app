@@ -15,6 +15,7 @@ import { Auth } from '../auth/entities/auth.entity';
 import { LoginUserDto } from './dto/login-user.dto';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Logger as WinstonLogger } from 'winston';
+import { Role } from 'src/common/decorator/roles.decorator';
 @Injectable()
 export class UsersService {
   constructor(@InjectRepository(User)
@@ -36,7 +37,7 @@ export class UsersService {
     const user = await this.usersRepository.create({
       ...createUserDto, password: hashedPassword
     });
-    user.role = 'cashier'; 
+    user.role = Role.cashier; 
     await this.usersRepository.save(user);
     const accesstoken = await this.generateToken(user);
     const refreshtoken = this.generateRefreshToken();
@@ -148,7 +149,7 @@ export class UsersService {
 
 
   private async generateToken(user: User) {
-    const payload = { id: user.id, email: user.email, role: user.role };
+    const payload = { id: user.id, email: user.email, role: user.role , branchId: user.branch?.id ?? ''};
     const token = await this.jwtService.sign(payload);
     return token;
   }

@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -17,454 +17,290 @@ import { CreateProductAttributeValueDto } from './dto/create-product-attribute-v
 import { UpdateVariantDto } from './dto/update-variant.dto';
 import { CreateProductAttributeDto } from './dto/create-product-attribute.dto';
 import { IFilterProducts, IGetVariantResponse, ILinkedVariant, IStats, IVariant } from 'src/shared/interfaces/product-response';
+import { Role } from 'src/common/decorator/roles.decorator';
 @Injectable()
 export class ProductsService {
-
   constructor(
-    @InjectRepository(Product) private readonly productRepo: Repository<Product>,
-    @InjectRepository(Category) private readonly categoryRepo: Repository<Category>,
-    @InjectRepository(Supplier) private readonly supplierRepo: Repository<Supplier>,
-    @InjectRepository(ProductVariant) private readonly variantRepo: Repository<ProductVariant>,
-    @InjectRepository(ProductAttribute) private readonly attributeRepo: Repository<ProductAttribute>,
-    @InjectRepository(ProductAttributeValue) private readonly attrValueRepo: Repository<ProductAttributeValue>,
-    @InjectRepository(ProductVariantValue) private readonly variantValueRepo: Repository<ProductVariantValue>,
-    @Inject(CACHE_MANAGER) private readonly cache: cashTypes.IAppCache,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+    @InjectRepository(ProductVariant)
+    private readonly variantRepo: Repository<ProductVariant>,
+    @InjectRepository(ProductAttribute)
+    private readonly attributeRepo: Repository<ProductAttribute>,
+    @InjectRepository(ProductAttributeValue)
+    private readonly attributeValueRepo: Repository<ProductAttributeValue>,
+    @InjectRepository(ProductVariantValue)
+    private readonly variantValueRepo: Repository<ProductVariantValue>,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
+    @InjectRepository(Supplier)
+    private readonly supplierRepo: Repository<Supplier>,
+  ) {}
 
-  ) { }
-  private async invalidateProductCaches(productId?: string) {
-    // basic invalidation strategy: remove product list + product detail + category lists
-    try {
-      await this.cache.del('products_all');
-      if (productId) await this.cache.del(`product_${productId}`);
-    } catch {
-      /* ignore cache errors */
-    }
-  }
+  // ======================= BASIC CRUD =======================
 
-  // ------------------ PRODUCTS CRUD ------------------
-  async create(dto: CreateProductDto): Promise<Product> {
+  async create(dto: CreateProductDto, user: any) {
+    if (user.role === Role.cashier)
+      throw new ForbiddenException('Cashier cannot create products.');
+
     const category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
     if (!category) throw new NotFoundException('Category not found');
+
     const supplier = await this.supplierRepo.findOneBy({ id: dto.supplierId });
     if (!supplier) throw new NotFoundException('Supplier not found');
 
     const product = this.productRepo.create({
-      name: dto.name,
-      description: dto.description,
-      brand: dto.brand,
-      basePrice: dto.basePrice,
-      isActive: dto.isActive,
+      ...dto,
       category,
       supplier,
     });
-    const saved = await this.productRepo.save(product);
-    await this.invalidateProductCaches(saved.id);
-    return saved;
+    return this.productRepo.save(product);
   }
 
-  async findAll(page = 1, limit = 20, search?: string, categoryId?: string) : Promise<IFilterProducts> {
-    // normalize inputs
-    page = Number(page) || 1;
-    limit = Math.min(Number(limit) || 20, 100);
-
-    const cacheKey = `products_all_${page}_${limit}_${search || ''}_${categoryId || ''}`;
-    const cached = await this.cache.get<{ data: Product[]; total: number; page: number; limit: number }>(cacheKey);
-    if (cached) return cached;
-
-    const query = this.productRepo.createQueryBuilder('product')
+  async findAll(
+    page = 1,
+    limit = 20,
+    search?: string,
+    categoryId?: string,
+    user?: any,
+  ) {
+    const qb = this.productRepo
+      .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
-      .leftJoinAndSelect('product.supplier', 'supplier');
+      .leftJoinAndSelect('product.supplier', 'supplier')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .where('product.isActive = true');
 
-    if (search) query.andWhere('product.name ILIKE :search', { search: `%${search}%` });
-    if (categoryId) query.andWhere('category.id = :categoryId', { categoryId });
+    // restrict to branch
+    if (user.role !== Role.admin)
+      qb.andWhere('product.branchId = :branchId', { branchId: user.branchId });
 
-    query.skip((page - 1) * limit).take(limit);
+    // filters
+    if (search)
+      qb.andWhere('product.name ILIKE :search', { search: `%${search}%` });
+    if (categoryId)
+      qb.andWhere('product.categoryId = :categoryId', { categoryId });
 
-    const [data, total] = await query.getManyAndCount();
-    const result = { data, total, page, limit };
-    await this.cache.set(cacheKey, result, 60 * 5);
-    return result;
+    qb.skip((page - 1) * limit).take(limit);
+    return qb.getManyAndCount();
   }
 
-  async flatList(): Promise<Product[]> {
-    const cacheKey = 'products_flat';
-    const cached = await this.cache.get<Product[]>(cacheKey);
-    if (cached) return cached;
-    const list = await this.productRepo.find({ select: ['id', 'name', 'basePrice'] });
-    await this.cache.set(cacheKey, list, 60 * 5);
-    return list;
+  async flatList(user: any) {
+    const where =
+      user.role === Role.admin
+        ? {}
+        : { branch: { id: user.branchId }, isActive: true };
+    return this.productRepo.find({ where, select: ['id', 'name', 'basePrice'] });
   }
 
-  async findOne(id: string): Promise<Product> {
-    const cacheKey = `product_${id}`;
-    const cached = await this.cache.get<Product>(cacheKey);
-    if (cached) return cached;
+  async stats(user: any) {
+    if (user.role === Role.cashier)
+      throw new ForbiddenException('Cashier cannot view stats.');
 
+    const qb = this.productRepo
+      .createQueryBuilder('product')
+      .leftJoin('product.variants', 'variant');
+
+    if (user.role !== Role.admin)
+      qb.where('product.branchId = :branchId', { branchId: user.branchId });
+
+    const [total, active, inactive] = await Promise.all([
+      qb.getCount(),
+      qb.clone().where('product.isActive = true').getCount(),
+      qb.clone().where('product.isActive = false').getCount(),
+    ]);
+
+    return { total, active, inactive };
+  }
+
+  async search(name: string, user: any) {
+    const where =
+      user.role === Role.admin
+        ? { name: ILike(`%${name}%`) }
+        : {
+            name: ILike(`%${name}%`),
+            branch: { id: user.branchId },
+            isActive: true,
+          };
+    return this.productRepo.find({ where, take: 10 });
+  }
+
+  async findByCategory(categoryId: string, user: any) {
+    const where =
+      user.role === Role.admin
+        ? { category: { id: categoryId } }
+        : {
+            category: { id: categoryId },
+            branch: { id: user.branchId },
+          };
+    return this.productRepo.find({ where, relations: ['variants'] });
+  }
+
+  async findOne(id: string, user: any) {
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: [
-        'variants',
-        'attributeValues', // your entity name
-        'variants.values',
-        'category',
-        'supplier',
-      ],
-      withDeleted: true,
+      relations: ['category', 'supplier',  'variants' ,'variants.values' ],
     });
     if (!product) throw new NotFoundException('Product not found');
-    await this.cache.set(cacheKey, product, 60 * 10);
+
+
     return product;
   }
 
-  async update(id: string, dto: UpdateProductDto) : Promise<Product> {
-    const product = await this.productRepo.findOneBy({ id });
-    if (!product) throw new NotFoundException('Product not found');
+  async update(id: string, dto: UpdateProductDto, user: any) {
+    const product = await this.findOne(id, user);
+    if (user.role === Role.cashier)
+      throw new ForbiddenException('Cashier cannot update products.');
+
     Object.assign(product, dto);
-    const updated = await this.productRepo.save(product);
-    await this.invalidateProductCaches(id);
-    return updated;
+    return this.productRepo.save(product);
   }
 
-  async remove(id: string) : Promise<{ message: string }> {
+  async remove(id: string, user: any) {
+    if (user.role !== Role.admin)
+      throw new ForbiddenException('Only admin can delete products.');
+
     const product = await this.productRepo.findOneBy({ id });
     if (!product) throw new NotFoundException('Product not found');
     await this.productRepo.softRemove(product);
-    await this.invalidateProductCaches(id);
-    return { message: 'Product soft deleted' };
+    return { status: 'deleted', id };
   }
 
-  async restore(id: string): Promise<{ message: string }> {
+  async restore(id: string, user: any) {
+    if (user.role !== Role.admin)
+      throw new ForbiddenException('Only admin can restore products.');
+
     await this.productRepo.restore(id);
-    await this.invalidateProductCaches(id);
-    return { message: 'Product restored' };
+    return { status: 'restored', id };
   }
 
-  // ------------------ SEARCH / STATS / FILTER ------------------
-  async search(name: string) : Promise<Product[]> {
-    if (!name) return [];
-    return this.productRepo.find({
-      where: { name: ILike(`%${name}%`) },
-      relations: ['category'],
-    });
+  // ======================= VARIANTS =======================
+
+  async addVariants(productId: string, dtos: CreateVariantDto[], user: any) {
+    const product = await this.findOne(productId, user);
+    if (user.role === Role.cashier)
+      throw new ForbiddenException('Cashier cannot add variants.');
+
+    const variants = dtos.map((dto) =>
+      this.variantRepo.create({ ...dto, product }),
+    );
+    return this.variantRepo.save(variants);
   }
 
-  async findByCategory(categoryId: string) : Promise<Product[]> {
-    const cacheKey = `products_category_${categoryId}`;
-    const cached = await this.cache.get<Product[]>(cacheKey);
-    if (cached) return cached;
-
-    const data = await this.productRepo.find({
-      where: { category: { id: categoryId } },
-      relations: ['category', 'variants'],
-    });
-    await this.cache.set(cacheKey, data, 60 * 10);
-    return data;
-  }
-
-  async stats() : Promise<IStats[]> {
-    const cacheKey = 'product_stats';
-    const cached  = await this.cache.get(cacheKey) as IStats[];
-    if (cached) return cached;
-
-    // use lower-case alias to avoid Postgres alias issues
-    const raw = await this.productRepo
-      .createQueryBuilder('product')
-      .leftJoin('product.category', 'category')
-      .select('category.id', 'category_id')
-      .addSelect('category.name', 'category_name')
-      .addSelect('COUNT(product.id)', 'product_count')
-      .groupBy('category.id')
-      .addGroupBy('category.name')
-      .orderBy('product_count', 'DESC')
-      .getRawMany();
-
-    // map types
-    const stats = raw.map(r => ({
-      categoryId: r.category_id,
-      categoryName: r.category_name,
-      productCount: Number(r.product_count),
-    }));
-
-    await this.cache.set(cacheKey, stats, 60 * 10);
-    return stats;
-  }
-
-  // ------------------ VARIANTS ------------------
-  // addVariants: accepts bulk array to reduce endpoints
-  async addVariants(productId: string, dtos: CreateVariantDto[]) : Promise<ProductVariant[]> {
-    const product = await this.productRepo.findOneBy({ id: productId });
-    if (!product) throw new NotFoundException('Product not found');
-
-    const entities = dtos.map(dto => this.variantRepo.create({ ...dto, product }));
-    const saved = await this.variantRepo.save(entities);
-    await this.invalidateProductCaches(productId);
-    return saved;
-  }
-
-  async getVariants(productId: string) : Promise<IVariant[]> {
-    const variants = await this.variantRepo.find({
+  async getVariants(productId: string, user: any) {
+    await this.findOne(productId, user);
+    return this.variantRepo.find({
       where: { product: { id: productId } },
-      relations: [
-        'product',
-        'values',
-        'values.attributeValue',
-        'values.attributeValue.attribute',
-      ],
+      relations: ['values'],
     });
-
-    // نرتب القيم حسب الـ attribute
-    const formattedVariants = variants.map((variant) => {
-      const groupedAttributes = {};
-
-      for (const val of variant.values) {
-        const attr = val.attributeValue.attribute;
-        const value = val.attributeValue.value;
-
-        if (!groupedAttributes[attr.id]) {
-          groupedAttributes[attr.id] = {
-            id: attr.id,
-            name: attr.name,
-            price : variant.price,
-            values: [],
-          };
-        }
-
-        groupedAttributes[attr.id].values.push({
-          id: val.attributeValue.id,
-          value,
-        });
-      }
-
-      return {
-        id: variant.id,
-        sku: variant.sku,
-        price: variant.price,
-        BasePrice: variant.product.basePrice,
-        costPrice: variant.costPrice,
-        stockQuantity: variant.stockQuantity,
-        isActive: variant.isActive,
-        attributes: Object.values(groupedAttributes),
-      };
-    });
-
-    return formattedVariants;
   }
 
-
-  async updateVariant(variantId: string, dto: UpdateVariantDto) : Promise<IVariant> {
+  async updateVariant(variantId: string, dto: UpdateVariantDto, user: any) {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
-      relations: [
-        'values',
-        'values.attributeValue',
-        'values.attributeValue.attribute',
-        'product',
-      ],
+      relations: ['product', 'product.branch'],
     });
-
     if (!variant) throw new NotFoundException('Variant not found');
 
-    // تحديث البيانات الأساسية
+   
+
     Object.assign(variant, dto);
-    const saved = await this.variantRepo.save(variant);
-
-    // إبطال الكاش القديم
-    await this.invalidateProductCaches(variant.product?.id);
-
-    // بعد التحديث نرتب نفس شكل البيانات النهائي
-    const groupedAttributes = {};
-
-    for (const val of variant.values) {
-      const attr = val.attributeValue.attribute;
-      const value = val.attributeValue.value;
-
-      if (!groupedAttributes[attr.id]) {
-        groupedAttributes[attr.id] = {
-          id: attr.id,
-          name: attr.name,
-          values: [],
-        };
-      }
-
-      groupedAttributes[attr.id].values.push({
-        id: val.attributeValue.id,
-        value,
-      });
-    }
-
-    return {
-      id: saved.id,
-      sku: saved.sku,
-      price: saved.price,
-      BasePrice: saved.product.basePrice,
-      costPrice: saved.costPrice,
-      stockQuantity: saved.stockQuantity,
-      isActive: saved.isActive,
-      attributes: Object.values(groupedAttributes),
-    };
+    return this.variantRepo.save(variant);
   }
 
+  async deleteVariant(variantId: string, user: any) {
+    if (user.role !== Role.admin)
+      throw new ForbiddenException('Only admin can delete variants.');
 
-  async deleteVariant(variantId: string): Promise<{ message: string }> {
-    const variant = await this.variantRepo.findOne({
-      where: { id: variantId },
-      relations: ['product'],
-    });
+    const variant = await this.variantRepo.findOneBy({ id: variantId });
     if (!variant) throw new NotFoundException('Variant not found');
-    await this.variantRepo.remove(variant);
-    await this.invalidateProductCaches(variant.product?.id);
-    return { message: 'Variant deleted' };
+    await this.variantRepo.softRemove(variant);
+    return { status: 'deleted', id: variantId };
   }
 
-  // ------------------ ATTRIBUTE VALUES (product-scoped) ------------------
-  async addAttributeValue(productId: string, dto: CreateProductAttributeValueDto) : Promise<ProductAttributeValue> {
-    const product = await this.productRepo.findOneBy({ id: productId });
-    if (!product) throw new NotFoundException('Product not found');
+  // ======================= ATTRIBUTES =======================
 
-    const attribute = await this.attributeRepo.findOneBy({ id: dto.attributeId });
-    if (!attribute) throw new NotFoundException('Attribute not found');
+  async addAttribute(dto: CreateProductAttributeDto, user: any) {
+    if (user.role === Role.cashier)
+      throw new ForbiddenException('Cashier cannot create attributes.');
 
-    const value = this.attrValueRepo.create({
-      value: dto.value,
-      product,
-      attribute,
-    });
-    const saved = await this.attrValueRepo.save(value);
-    await this.invalidateProductCaches(productId);
-    return saved;
-  }
-
-  async getAttributes(productId: string) : Promise<ProductAttributeValue[]> {
-    return this.attrValueRepo.find({
-      where: { product: { id: productId } },
-      relations: ['attribute'],
-    });
-  }
-  async getAttributesByCategory(categorytId: string) : Promise<ProductAttribute[]> {
-    return this.attributeRepo.find({
-      where: { category: { id: categorytId } },
-      relations: ['values', 'category'],
-    });
-  }
-  // product.service.ts
-  async addAttribute(dto: CreateProductAttributeDto) : Promise<ProductAttribute> {
     const category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
     if (!category) throw new NotFoundException('Category not found');
-
-    const exists = await this.attributeRepo.findOne({
-      where: { name: dto.name, category: { id: dto.categoryId } },
-    });
-    if (exists) throw new BadRequestException('Attribute already exists in this category');
 
     const attribute = this.attributeRepo.create({
       name: dto.name,
       category,
     });
-
-    const saved = await this.attributeRepo.save(attribute);
-    await this.invalidateProductCaches(dto.categoryId);
-    return saved;
+    return this.attributeRepo.save(attribute);
   }
 
+  async addAttributeValue(productId: string, dto: CreateProductAttributeValueDto, user: any) {
+    const product = await this.findOne(productId, user);
+    if (user.role === Role.cashier)
+      throw new ForbiddenException('Cashier cannot add attribute values.');
 
-  // ------------------ VARIANT <-> ATTRIBUTE VALUE LINKING ------------------
-  async linkVariantValues(variantId: string, valueIds: string[]) : Promise<ILinkedVariant> {
+    const attribute = await this.attributeRepo.findOneBy({ id: dto.attributeId });
+    if (!attribute) throw new NotFoundException('Attribute not found');
+
+    const value = this.attributeValueRepo.create({
+      value: dto.value,
+      attribute,
+      product,
+    });
+    return this.attributeValueRepo.save(value);
+  }
+
+  async getAttributes(productId: string, user: any) {
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+    
+    return this.attributeValueRepo.find({
+      where: { product: { id: product.id } },
+      relations: ['attribute'],
+    });
+  }
+
+  async getAttributesByCategory(categoryId: string, user: any) {
+    const attributes = await this.attributeRepo.find({
+      where: { category: { id: categoryId } },
+      relations: ['values'],
+    });
+    return attributes;
+  }
+
+  // ======================= VARIANT VALUES =======================
+
+  async linkVariantValues(variantId: string, valueIds: string[], user: any) {
+    const variant = await this.variantRepo.findOne({
+      where: { id: variantId },
+      relations: ['product','values'],
+    });
+    if (!variant) throw new NotFoundException('Variant not found');
+
+    
+
+    const values = await this.attributeValueRepo.findBy({ id: In(valueIds) });
+    const links = values.map((v) =>
+      this.variantValueRepo.create({ variant, attributeValue: v }),
+    );
+
+    return this.variantValueRepo.save(links);
+  }
+
+  async getVariantValues(variantId: string, user: any) {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product'],
     });
     if (!variant) throw new NotFoundException('Variant not found');
 
-    const values = await this.attrValueRepo.find({
-      where: { id: In(valueIds) },
-      relations: ['attribute'],
-    });
+    
 
-    if (values.length === 0)
-      throw new BadRequestException('No valid attribute values found');
-
-    // امسح القديم لو موجود
-    await this.variantValueRepo.delete({ variant: { id: variantId } });
-
-    // اربط الجديد
-    const links = values.map((v) =>
-      this.variantValueRepo.create({
-        variant,
-        attributeValue: v,
-      }),
-    );
-
-    await this.variantValueRepo.save(links);
-
-    // cache invalidation
-    await this.invalidateProductCaches(variant.product.id);
-
-    // response بسيط ومنسق
-    return {
-      variantId,
-      linkedValues: values.map((v) => ({
-        id: v.id,
-        value: v.value,
-        attribute: {
-          id: v.attribute.id,
-          name: v.attribute.name,
-        },
-      })),
-    };
-  }
-
-
-  async getVariantValues(variantId: string) : Promise<IGetVariantResponse> {
-    const cacheKey = `variant_values_${variantId}`;
-
-    // نحاول نجيب من الكاش الأول
-    const cached  = await this.cache.get(cacheKey) as IGetVariantResponse;
-    if (cached) return cached;
-
-    const variantValues = await this.variantValueRepo.find({
+    return this.variantValueRepo.find({
       where: { variant: { id: variantId } },
-      relations: [
-        'variant',
-        'variant.product',
-        'attributeValue',
-        'attributeValue.attribute',
-      ],
+      relations: ['attributeValue', 'attributeValue.attribute'],
     });
-
-    if (variantValues.length === 0) {
-      throw new NotFoundException('No attribute values found for this variant');
-    }
-
-    // group حسب attribute
-    const grouped: Record<string, { id: string; name: string; values: any[] }> = {};
-
-    for (const vv of variantValues) {
-      const attr = vv.attributeValue.attribute;
-      if (!grouped[attr.id]) {
-        grouped[attr.id] = {
-          id: attr.id,
-          name: attr.name,
-          values: [],
-        };
-      }
-      grouped[attr.id].values.push({
-        id: vv.attributeValue.id,
-        value: vv.attributeValue.value,
-      });
-    }
-
-    const result = {
-      variantId: variantId,
-      sku: variantValues[0].variant.sku,
-      productName: variantValues[0].variant.product.name,
-      attributes: Object.values(grouped),
-    };
-
-    await this.cache.set(cacheKey, result, 1000 * 60 * 5);
-
-    return result;
   }
-
-
-
 }

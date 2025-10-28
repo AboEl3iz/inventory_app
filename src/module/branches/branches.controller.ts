@@ -7,48 +7,56 @@ import { AuthenticationGuard } from 'src/common/guard/authentication.guard';
 import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
 
 @Controller('branches')
+@UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class BranchesController {
   constructor(private readonly branchesService: BranchesService) {}
 
-  @Post("create")
+  @Post('create')
   @Roles(Role.admin)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
-  create(@Body() createBranchDto: CreateBranchDto , @Req() req : any) {
-    return this.branchesService.create(createBranchDto , req.user.id);
+  create(@Body() dto: CreateBranchDto, @Req() req: any) {
+    return this.branchesService.create(dto, req.user.id);
   }
 
-  @Get("get-all")
+  @Get('get-all')
   @Roles(Role.admin)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
   findAll() {
     return this.branchesService.findAll();
   }
 
   @Get('branch/:id')
   @Roles(Role.admin, Role.manager)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
   findOne(@Param('id') id: string) {
     return this.branchesService.findOne(id);
   }
 
   @Patch('branch/:id')
   @Roles(Role.admin)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
-  update(@Param('id') id: string, @Body() updateBranchDto: UpdateBranchDto) {
-    return this.branchesService.update(id, updateBranchDto);
+  update(@Param('id') id: string, @Body() dto: UpdateBranchDto) {
+    return this.branchesService.update(id, dto);
   }
 
   @Delete('branch/:id')
   @Roles(Role.admin)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
   remove(@Param('id') id: string) {
     return this.branchesService.remove(id);
   }
 
   @Get(':id/stats')
   @Roles(Role.admin, Role.manager)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
-  async getBranchStats(@Param('id') id: string , @Req() req ) {
-    return this.branchesService.getBranchStats(id , req.user.id);
+  async getBranchStats(@Param('id') id: string, @Req() req) {
+    return this.branchesService.getBranchStats(id, req.user);
+  }
+
+  // ✅ NEW ENDPOINTS
+  @Post(':branchId/assign-manager/:userId')
+  @Roles(Role.admin)
+  assignManager(@Param('branchId') branchId: string, @Param('userId') userId: string) {
+    return this.branchesService.assignUserToBranch(branchId, userId, Role.manager);
+  }
+
+  @Post(':branchId/assign-cashier/:userId')
+  @Roles(Role.admin)
+  assignCashier(@Param('branchId') branchId: string, @Param('userId') userId: string) {
+    return this.branchesService.assignUserToBranch(branchId, userId, Role.cashier);
   }
 }

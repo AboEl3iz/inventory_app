@@ -1,6 +1,6 @@
 export interface ISuppliersRecommendations {
     branch: string;
-    product: string;
+    variant: string;
     currentQuantity: number;
     threshold: number;
     recommendedSupplier: string;

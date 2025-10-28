@@ -3,6 +3,7 @@ import { BaseEntity } from '../../../entities/base.entity';import { Invoice } fr
 import { Purchase } from '../../purchases/entities/purchase.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 import { Auth } from '../../auth/entities/auth.entity';
+import { StockMovement } from 'src/module/stock/entities/stock.entity';
 
 @Entity('users')
 export class User extends BaseEntity {
@@ -15,19 +16,22 @@ export class User extends BaseEntity {
   @Column()
   password: string;
 
-  
-  @OneToOne(() => Auth, auth => auth.user , { cascade: true })
-  reftoken: string;
+  @OneToOne(() => Auth, auth => auth.user, { cascade: true })
+  auth: Auth;
+
   @ManyToOne(() => Branch, branch => branch.users)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
   @Column({ default: 'admin' })
-  role: 'admin' | 'manager' | 'cashier'
+  role: 'admin' | 'manager' | 'cashier';
 
   @OneToMany(() => Invoice, invoice => invoice.user)
   invoices: Invoice[];
 
   @OneToMany(() => Purchase, purchase => purchase.user)
   purchases: Purchase[];
+
+  @OneToMany(() => StockMovement, movement => movement.user)
+  stockMovements: StockMovement[];
 }

@@ -23,6 +23,9 @@ import { JWTConfig } from './config/jwt.config';
 import { JwtModule } from '@nestjs/jwt';
 import { WinstonModule } from 'nest-winston';
 import * as winston from 'winston';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { CacheModule } from '@nestjs/cache-manager';
+const cloudinary = require('cloudinary').v2;
 @Module({
   imports: [
 
@@ -39,7 +42,6 @@ import * as winston from 'winston';
       ],
     }),
 
-    // LoggerModule,
     ProductsModule,
     BranchesModule,
     EventsModule,
@@ -58,12 +60,15 @@ import * as winston from 'winston';
       isGlobal: true,
 
     }),
+    EventEmitterModule.forRoot(),
+    CacheModule.register({ ttl: 300, isGlobal: true }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) =>
         await typeOrmconfig(configService),
       inject: [ConfigService],
     }),
+    
 
 
   ],

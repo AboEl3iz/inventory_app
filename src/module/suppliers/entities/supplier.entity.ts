@@ -4,7 +4,7 @@ import { Purchase } from '../../purchases/entities/purchase.entity';
 
 @Entity('suppliers')
 export class Supplier extends BaseEntity {
-  @Column({unique: true})
+  @Column({ unique: true })
   name: string;
 
   @Column()
@@ -15,6 +15,12 @@ export class Supplier extends BaseEntity {
 
   @Column()
   email: string;
+
+  @Column({ nullable: true })
+  address: string;
+
+  @Column({ default: true })
+  isActive: boolean;
 
   @OneToMany(() => Product, product => product.supplier)
   products: Product[];

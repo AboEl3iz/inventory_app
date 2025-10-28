@@ -27,7 +27,7 @@ export class SuppliersService {
     @InjectRepository(Branch)
     private readonly branchRepo: Repository<Branch>,
   ) { }
-  async create(createSupplierDto: CreateSupplierDto) : Promise<Supplier> {
+  async create(createSupplierDto: CreateSupplierDto): Promise<Supplier> {
     const verifyname = await this.supplierRepository.findOneBy({ name: createSupplierDto.name });
     if (verifyname) {
       throw new BadRequestException('Supplier already exists');
@@ -40,7 +40,7 @@ export class SuppliersService {
     return this.supplierRepository.find({ relations: ['products', 'purchases'] });
   }
 
-  async findOne(id: string) : Promise<Supplier> {
+  async findOne(id: string): Promise<Supplier> {
     const supplier = await this.supplierRepository.findOne({
       where: { id },
       relations: ['products', 'purchases'],
@@ -52,7 +52,7 @@ export class SuppliersService {
 
   }
 
-  async update(id: string, updateSupplierDto: UpdateSupplierDto) : Promise<Supplier> {
+  async update(id: string, updateSupplierDto: UpdateSupplierDto): Promise<Supplier> {
     const supplier = await this.supplierRepository.preload({
       id: id,
       ...updateSupplierDto,
@@ -63,7 +63,7 @@ export class SuppliersService {
     return this.supplierRepository.save(supplier);
   }
 
-  async remove(id: string) : Promise<{ message: string }> {
+  async remove(id: string): Promise<{ message: string }> {
     const supplier = await this.findOne(id);
     if (!supplier) {
       throw new BadRequestException('Supplier not found');
@@ -72,69 +72,84 @@ export class SuppliersService {
     return { message: 'Supplier removed successfully' };
   }
 
-  async getRefillRecommendations() : Promise<ISuppliersRecommendations[] | { message: string }> {
+  async getRefillRecommendations(): Promise<ISuppliersRecommendations[] | { message: string }> {
     // 🧮 Step 1: Get all inventory items below minThreshold
     const lowStockItems = await this.inventoryRepo
       .createQueryBuilder('inventory')
-      .leftJoinAndSelect('inventory.product', 'product')
+      .leftJoinAndSelect('inventory.variant', 'variant')
+      .leftJoinAndSelect('variant.product', 'product')  // ✅ Add this line
       .leftJoinAndSelect('inventory.branch', 'branch')
       .where('inventory.quantity < inventory.minThreshold')
       .getMany();
 
-
-    if (!lowStockItems.length)
+    if (!lowStockItems.length) {
       return { message: '✅ All stocks are above threshold.' };
+    }
 
     // 🧠 Step 2: Generate recommendations
-    const recommendations: { branch: string; product: string; currentQuantity: number; threshold: number; recommendedSupplier: string; avgPurchaseCost: number; }[] = [];
+    const recommendations: ISuppliersRecommendations[] = [];
 
     for (const item of lowStockItems) {
-      const { product, branch, quantity, minThreshold } = item;
+      const { variant, branch, quantity, minThreshold } = item;
+      if (!variant || !branch) {
+        console.warn('Skipping item missing branch or variant', item.id);
+        continue;
+      }
 
-      // 🧾 Get recent purchases for this product
+      // 🧾 Get recent purchases for this variant in the same branch
       const recentPurchases = await this.purchaseRepo
         .createQueryBuilder('purchase')
         .leftJoinAndSelect('purchase.supplier', 'supplier')
+        .leftJoinAndSelect('purchase.items', 'items')
+        .leftJoinAndSelect('items.variant', 'itemVariant')  // ✅ Add this line
         .leftJoin('purchase.branch', 'branch')
         .where('purchase.branchId = :branchId', { branchId: branch.id })
         .andWhere('purchase.status = :status', { status: 'completed' })
-        .andWhere('purchase.totalAmount > 0')
+        .andWhere('items.variantId = :variantId', { variantId: variant.id })
         .orderBy('purchase.createdAt', 'DESC')
         .limit(5)
         .getMany();
 
       if (!recentPurchases.length) continue;
 
-      // 🧮 Calculate average purchase price and pick top supplier
-      const supplierStats = new Map<
-        string,
-        { totalAmount: number; count: number; supplier: Supplier }
-      >();
+      // 🧮 Calculate average cost per supplier for this variant
+      const supplierStats = new Map<string, { totalCost: number; count: number; supplier: Supplier }>();
 
       for (const p of recentPurchases) {
         if (!p.supplier) continue;
+
+        // حساب التكلفة الفعلية للـ variant من items
+        const variantItems = p.items.filter(it => it.variant.id === variant.id);
+        const variantTotal = variantItems.reduce((sum, it) => sum + it.unitCost * it.quantity, 0);
+
         const key = p.supplier.name;
-        if (!supplierStats.has(key))
-          supplierStats.set(key, { totalAmount: 0, count: 0, supplier: p.supplier });
+        if (!supplierStats.has(key)) {
+          supplierStats.set(key, { totalCost: 0, count: 0, supplier: p.supplier });
+        }
+
         const data = supplierStats.get(key)!;
-        data.totalAmount += p.totalAmount;
-        data.count++;
+        data.totalCost += variantTotal;
+        data.count += variantItems.length;
       }
 
+      if (!supplierStats.size) continue;
+
+      // 🧠 Pick best supplier based on lowest avg cost
       const bestSupplier = [...supplierStats.values()].reduce((prev, curr) =>
-        curr.totalAmount / curr.count < prev.totalAmount / prev.count ? curr : prev,
+        curr.totalCost / curr.count < prev.totalCost / prev.count ? curr : prev,
       );
 
       recommendations.push({
         branch: branch.name,
-        product: product.name,
+        variant: variant.product.name,
         currentQuantity: quantity,
         threshold: minThreshold,
         recommendedSupplier: bestSupplier.supplier.name,
-        avgPurchaseCost: +(bestSupplier.totalAmount / bestSupplier.count).toFixed(2),
+        avgPurchaseCost: +(bestSupplier.totalCost / bestSupplier.count).toFixed(2),
       });
     }
 
     return recommendations;
   }
+
 }
