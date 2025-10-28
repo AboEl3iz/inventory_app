@@ -92,7 +92,7 @@ export class InvoicesService {
         //     qty: i.quantity,
         //   })),
         // });
-        this.invoicesQueue.add('invoiceCreated', {
+        this.invoicesQueue.add(INVOICE_CREATED, {
           invoiceId: savedInvoice.id,
           branchId,
           items: savedItems.map((i) => ({
@@ -182,7 +182,7 @@ export class InvoicesService {
     //     qty: it.quantity,
     //   })),
     // });
-    await this.invoicesQueue.add('invoiceCanceled', {
+    await this.invoicesQueue.add(INVOICE_CANCELED, {
       invoiceId: id,
       branchId: invoice.branch.id,
       items: invoice.items.map((it) => ({

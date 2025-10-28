@@ -1,10 +1,12 @@
 import Email from "email-templates";
 import emilConfig from "src/config/email.config";
-
+import 'dotenv/config';
+import { config } from "dotenv";
+config();
 async function sendEmail({to, templete , data}) {
     try {
         const email = new Email({
-            message: { from: "My App <${process.env.EMAIL_FROM}>" },
+            message: { from: `My App <${process.env.EMAIL_FROM}>` },
             send: true,
             transport: emilConfig,
             views: {

@@ -1,3 +1,6 @@
+import { config } from 'dotenv';
+
+config(); 
 const emilConfig = {
     host: process.env.EMAIL_HOST || 'smtp.example.com',
     port: Number(process.env.EMAIL_PORT) || 587,
