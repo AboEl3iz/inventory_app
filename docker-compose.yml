@@ -24,6 +24,18 @@ services:
     volumes:
       - redis_data:/data
 
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    ports:
+      - "5540:5540"
+    networks:
+      - inventory
+    volumes:
+      - redis_data:/db
+    depends_on:
+      - redis
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin

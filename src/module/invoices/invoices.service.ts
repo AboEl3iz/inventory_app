@@ -11,6 +11,7 @@ import { INVOICE_CANCELED, INVOICE_CREATED } from 'src/shared/event.constants';
 import { InvoiceItem } from './entities/invoice_items.entity';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { InventoryService } from '../inventory/inventory.service';
+import { InjectQueue } from '@nestjs/bullmq';
 
 @Injectable()
 export class InvoicesService {
@@ -22,6 +23,7 @@ export class InvoicesService {
     @InjectRepository(ProductVariant) private variantRepo: Repository<ProductVariant>,
     private readonly eventEmitter: EventEmitter2,
     private readonly inventoryService: InventoryService,
+    @InjectQueue('INVOICES_QUEUE') private invoicesQueue,
   ) {}
 
   /**
@@ -82,7 +84,15 @@ export class InvoicesService {
       }
 
       queueMicrotask(() => {
-        this.eventEmitter.emit(INVOICE_CREATED, {
+        // this.eventEmitter.emit(INVOICE_CREATED, {
+        //   invoiceId: savedInvoice.id,
+        //   branchId,
+        //   items: savedItems.map((i) => ({
+        //     variantId: i.variant.id,
+        //     qty: i.quantity,
+        //   })),
+        // });
+        this.invoicesQueue.add('invoiceCreated', {
           invoiceId: savedInvoice.id,
           branchId,
           items: savedItems.map((i) => ({
@@ -164,7 +174,15 @@ export class InvoicesService {
       });
     }
 
-    this.eventEmitter.emit(INVOICE_CANCELED, {
+    // this.eventEmitter.emit(INVOICE_CANCELED, {
+    //   invoiceId: id,
+    //   branchId: invoice.branch.id,
+    //   items: invoice.items.map((it) => ({
+    //     variantId: it.variant.id,
+    //     qty: it.quantity,
+    //   })),
+    // });
+    await this.invoicesQueue.add('invoiceCanceled', {
       invoiceId: id,
       branchId: invoice.branch.id,
       items: invoice.items.map((it) => ({

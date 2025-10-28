@@ -12,6 +12,7 @@ import { PURCHASE_COMPLETED } from 'src/shared/event.constants';
 import { PurchaseItem } from './entities/purchase-item.entity';
 import { User } from '../users/entities/user.entity';
 import { Role } from 'src/common/decorator/roles.decorator';
+import { InjectQueue } from '@nestjs/bullmq';
 
 @Injectable()
 export class PurchasesService {
@@ -23,6 +24,7 @@ export class PurchasesService {
     @InjectRepository(ProductVariant)
     private variantRepo: Repository<ProductVariant>,
     private eventEmitter: EventEmitter2,
+    @InjectQueue('PURCHASES_QUEUE') private purchasesQueue,
   ) {}
 
   async createPurchase(dto: CreatePurchaseDto, user: any) {
@@ -116,7 +118,16 @@ export class PurchasesService {
 
     const saved = await this.purchaseRepo.save(purchase);
 
-    this.eventEmitter.emit(PURCHASE_COMPLETED, {
+    // this.eventEmitter.emit(PURCHASE_COMPLETED, {
+    //   purchaseId: saved.id,
+    //   branchId: purchase.branch.id,
+    //   items: purchase.items.map((i) => ({
+    //     variantId: i.variant.id,
+    //     qty: i.quantity,
+    //   })),
+    // });
+
+    await this.purchasesQueue.add('purchaseCompleted', {
       purchaseId: saved.id,
       branchId: purchase.branch.id,
       items: purchase.items.map((i) => ({

@@ -26,6 +26,7 @@ import * as winston from 'winston';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CacheModule } from '@nestjs/cache-manager';
 const cloudinary = require('cloudinary').v2;
+import { BullModule } from '@nestjs/bullmq';
 @Module({
   imports: [
 
@@ -41,6 +42,17 @@ const cloudinary = require('cloudinary').v2;
         }),
       ],
     }),
+    BullModule.forRoot({
+      connection: {
+        host: 'localhost',
+        port: 6379,
+      },
+      defaultJobOptions: {
+        attempts: 3,
+      }
+    }),
+    BullModule.registerQueue({ name: "PURCHASES_QUEUE" }, { name: "INVOICES_QUEUE" }, { name: "LOW_STOCK_QUEUE" }),
+
 
     ProductsModule,
     BranchesModule,
@@ -68,7 +80,9 @@ const cloudinary = require('cloudinary').v2;
         await typeOrmconfig(configService),
       inject: [ConfigService],
     }),
-    
+
+
+
 
 
   ],

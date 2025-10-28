@@ -13,9 +13,6 @@ export class ProductImage extends BaseEntity {
   @Column()
   url: string;
 
-  @Column({ default: 0 })
-  sortOrder: number;
-
-  @Column({ default: false })
-  isPrimary: boolean;
+  @Column()
+  public_Id: string;
 }

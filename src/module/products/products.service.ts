@@ -18,6 +18,9 @@ import { UpdateVariantDto } from './dto/update-variant.dto';
 import { CreateProductAttributeDto } from './dto/create-product-attribute.dto';
 import { IFilterProducts, IGetVariantResponse, ILinkedVariant, IStats, IVariant } from 'src/shared/interfaces/product-response';
 import { Role } from 'src/common/decorator/roles.decorator';
+import { ProductImage } from './entities/product-images.entity';
+import { uploadImageToCloudinary, uploadMultipleImagesToCloudinary } from 'src/shared/cloudinary';
+import { UploadApiResponse } from 'cloudinary';
 @Injectable()
 export class ProductsService {
   constructor(
@@ -35,7 +38,10 @@ export class ProductsService {
     private readonly categoryRepo: Repository<Category>,
     @InjectRepository(Supplier)
     private readonly supplierRepo: Repository<Supplier>,
-  ) {}
+    @InjectRepository(ProductImage)
+    private readonly productImageRepo: Repository<ProductImage>,
+
+  ) { }
 
   // ======================= BASIC CRUD =======================
 
@@ -118,10 +124,10 @@ export class ProductsService {
       user.role === Role.admin
         ? { name: ILike(`%${name}%`) }
         : {
-            name: ILike(`%${name}%`),
-            branch: { id: user.branchId },
-            isActive: true,
-          };
+          name: ILike(`%${name}%`),
+          branch: { id: user.branchId },
+          isActive: true,
+        };
     return this.productRepo.find({ where, take: 10 });
   }
 
@@ -130,16 +136,16 @@ export class ProductsService {
       user.role === Role.admin
         ? { category: { id: categoryId } }
         : {
-            category: { id: categoryId },
-            branch: { id: user.branchId },
-          };
+          category: { id: categoryId },
+          branch: { id: user.branchId },
+        };
     return this.productRepo.find({ where, relations: ['variants'] });
   }
 
   async findOne(id: string, user: any) {
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['category', 'supplier',  'variants' ,'variants.values' ],
+      relations: ['category', 'supplier', 'variants', 'variants.values'],
     });
     if (!product) throw new NotFoundException('Product not found');
 
@@ -202,7 +208,7 @@ export class ProductsService {
     });
     if (!variant) throw new NotFoundException('Variant not found');
 
-   
+
 
     Object.assign(variant, dto);
     return this.variantRepo.save(variant);
@@ -255,7 +261,7 @@ export class ProductsService {
       where: { id: productId },
     });
     if (!product) throw new NotFoundException('Product not found');
-    
+
     return this.attributeValueRepo.find({
       where: { product: { id: product.id } },
       relations: ['attribute'],
@@ -275,18 +281,22 @@ export class ProductsService {
   async linkVariantValues(variantId: string, valueIds: string[], user: any) {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
-      relations: ['product','values'],
+      relations: ['product', 'values'],
     });
     if (!variant) throw new NotFoundException('Variant not found');
 
-    
+
 
     const values = await this.attributeValueRepo.findBy({ id: In(valueIds) });
     const links = values.map((v) =>
       this.variantValueRepo.create({ variant, attributeValue: v }),
     );
 
-    return this.variantValueRepo.save(links);
+    await this.variantValueRepo.save(links);
+    return {
+      ...variant,
+      values: [...variant.values, ...links],
+    }
   }
 
   async getVariantValues(variantId: string, user: any) {
@@ -296,11 +306,33 @@ export class ProductsService {
     });
     if (!variant) throw new NotFoundException('Variant not found');
 
-    
+
 
     return this.variantValueRepo.find({
       where: { variant: { id: variantId } },
       relations: ['attributeValue', 'attributeValue.attribute'],
     });
+  }
+
+  async uploadProductImages(productId: string, imageUrls: string[], user: any) {
+    const product = await this.findOne(productId, user);
+    if (user.role === Role.cashier)
+      throw new ForbiddenException('Cashier cannot upload product images.');
+    const response: UploadApiResponse[] = await uploadMultipleImagesToCloudinary(imageUrls, 'products');
+    const images = response.map((url) =>
+
+      this.productImageRepo.create({
+        url: url.secure_url,
+        public_Id: url.public_id,
+        product
+      }),
+    );
+    await this.productImageRepo.save(images);
+    product.images = images;
+    await this.productRepo.save(product);
+    return {
+      product: product.name,
+      images: images.map((img) => ({ url: img.url})),
+    };
   }
 }

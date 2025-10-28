@@ -28,8 +28,7 @@ export class Product extends BaseEntity {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
-  @Column({ type: 'text', nullable: true })
-  imageUrl: string;
+  
 
   @ManyToOne(() => Category, category => category.products, {
     onDelete: 'SET NULL',

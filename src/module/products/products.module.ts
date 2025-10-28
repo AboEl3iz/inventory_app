@@ -10,6 +10,7 @@ import { ProductAttribute } from './entities/product-attribute.entity';
 import { ProductVariant } from './entities/product-variant.entity';
 import { ProductAttributeValue } from './entities/product-attribute-value.entity';
 import { ProductVariantValue } from './entities/product-variant-value.entity';
+import { ProductImage } from './entities/product-images.entity';
 
 @Module({
   controllers: [ProductsController],
@@ -18,7 +19,7 @@ import { ProductVariantValue } from './entities/product-variant-value.entity';
     CacheModule.register({
       ttl: 60 * 5, // cache duration: 5 minutes
     }),
-    TypeOrmModule.forFeature([Product ,Supplier, ProductVariantValue ,ProductAttributeValue,ProductAttribute,ProductVariant,Category,Supplier]),
+    TypeOrmModule.forFeature([Product ,Supplier, ProductVariantValue ,ProductAttributeValue,ProductAttribute,ProductVariant,Category,Supplier , ProductImage]),
   ],
 })
 export class ProductsModule { }

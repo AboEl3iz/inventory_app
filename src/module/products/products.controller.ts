@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards, UseInterceptors, UploadedFile, UploadedFiles, BadRequestException } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -9,13 +9,15 @@ import { CreateProductAttributeDto } from './dto/create-product-attribute.dto';
 import { Roles, Role } from 'src/common/decorator/roles.decorator';
 import { AuthenticationGuard } from 'src/common/guard/authentication.guard';
 import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
-
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { FilesInterceptor } from '@nestjs/platform-express';
 @Controller('products')
-@UseGuards(AuthenticationGuard,AuthorizationGuard)
+@UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class ProductsController {
   constructor(private readonly productService: ProductsService) { }
 
-    // ------------------- BASIC CRUD -------------------
+  // ------------------- BASIC CRUD -------------------
 
   // only admin or manager can create new products
   @Roles(Role.admin, Role.manager)
@@ -25,7 +27,47 @@ export class ProductsController {
     return this.productService.create(dto, user);
   }
 
-  
+  @Roles(Role.admin, Role.manager)
+  @Post(':productId/images')
+  @UseInterceptors(
+    FilesInterceptor('images', 5, {
+      storage: diskStorage({
+        destination: 'src/uploads/products',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5 MB per file
+      },
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.match(/^image\/(jpeg|png|jpg|webp)$/)) {
+          return cb(new BadRequestException('Only image files (jpeg, jpg, png, webp) are allowed!'), false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadFile(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Param('productId') productId: string,
+    @Req() req,
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No images uploaded');
+    }
+
+
+
+    return this.productService.uploadProductImages(
+      productId,
+      files.map(file => file.path),
+      req.user,
+    );
+  }
+
+
 
   @Get()
   findAll(
@@ -187,3 +229,5 @@ export class ProductsController {
 
 
 }
+
+

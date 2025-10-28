@@ -7,6 +7,7 @@ import { Branch } from '../branches/entities/branch.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { User } from '../users/entities/user.entity';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   controllers: [PurchasesController],
@@ -14,7 +15,8 @@ import { User } from '../users/entities/user.entity';
   imports: [
     TypeOrmModule.forFeature([
       Purchase, ProductVariant, Branch, User, Supplier
-    ])
+    ]),
+    BullModule.registerQueue({ name: "PURCHASES_QUEUE" }),
   ],
 })
 export class PurchasesModule {}

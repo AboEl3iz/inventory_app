@@ -1,5 +1,6 @@
 import { UploadApiResponse } from "cloudinary";
 import cloudinary from "src/config/cloudinary.config";
+import fs from 'fs';
 
 export const uploadImageToCloudinary = async (filePath: string, folder: string) => {
   try {
@@ -21,18 +22,31 @@ export const deleteFromCloudinary = async (publicId: string) => {
   }
 };
 
-export const uploadMultipleImagesToCloudinary = async (filePaths: string[], folder: string) => {
+
+
+export const uploadMultipleImagesToCloudinary = async (
+  filePaths: string[],
+  folder: string,
+): Promise<UploadApiResponse[]> => {
   try {
-    const uploadPromises = filePaths.map((filePath) => {
-      return cloudinary.uploader.upload(filePath, { folder });
-    }
-    );
-    const results: UploadApiResponse[] = await Promise.all(uploadPromises);
+    const uploadPromises = filePaths.map(async (filePath) => {
+      const result = await cloudinary.uploader.upload(filePath, { folder });
+      
+      fs.unlink(filePath, (err) => {
+        if (err) console.error(`Failed to delete local file ${filePath}:`, err);
+      });
+
+      return result;
+    });
+
+    const results = await Promise.all(uploadPromises);
     return results;
   } catch (error) {
+    console.error('Cloudinary multiple upload error:', error);
     throw new Error('Cloudinary multiple upload failed');
   }
 };
+
 
 export const deleteMultipleFromCloudinary = async (publicIds: string[]) => {
   try {
