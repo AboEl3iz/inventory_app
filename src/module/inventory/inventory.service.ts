@@ -242,6 +242,9 @@ export class InventoryService {
     });
     if (!record) throw new NotFoundException('Inventory not found');
     this.checkBranchAccess(user, record.branch.id);
+    if(dto.quantity && dto.quantity < record.minThreshold){
+      throw new BadRequestException('Quantity cannot be less than minimum threshold');
+    }
 
     Object.assign(record, dto);
     const saved = await this.invRepo.save(record);

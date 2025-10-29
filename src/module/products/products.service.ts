@@ -19,7 +19,7 @@ import { CreateProductAttributeDto } from './dto/create-product-attribute.dto';
 import { IFilterProducts, IGetVariantResponse, ILinkedVariant, IStats, IVariant } from 'src/shared/interfaces/product-response';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { ProductImage } from './entities/product-images.entity';
-import { uploadImageToCloudinary, uploadMultipleImagesToCloudinary } from 'src/shared/cloudinary';
+import { deleteMultipleFromCloudinary, uploadImageToCloudinary, uploadMultipleImagesToCloudinary } from 'src/shared/cloudinary';
 import { UploadApiResponse } from 'cloudinary';
 @Injectable()
 export class ProductsService {
@@ -169,6 +169,10 @@ export class ProductsService {
     const product = await this.productRepo.findOneBy({ id });
     if (!product) throw new NotFoundException('Product not found');
     await this.productRepo.softRemove(product);
+    await this.productImageRepo.delete({ product: { id: product.id } });
+    await deleteMultipleFromCloudinary(
+      product.images.map((img) => img.public_Id),
+    );
     return { status: 'deleted', id };
   }
 
@@ -190,15 +194,21 @@ export class ProductsService {
     const variants = dtos.map((dto) =>
       this.variantRepo.create({ ...dto, product }),
     );
-    return this.variantRepo.save(variants);
+    await this.variantRepo.save(variants);
+    return {
+      product: product.name,
+      variants: variants,
+    }
   }
 
   async getVariants(productId: string, user: any) {
     await this.findOne(productId, user);
-    return this.variantRepo.find({
+   return this.variantRepo.find({
       where: { product: { id: productId } },
-      relations: ['values'],
+      relations: ['values', 'values.attribute' , ''],
     });
+
+  
   }
 
   async updateVariant(variantId: string, dto: UpdateVariantDto, user: any) {
@@ -294,8 +304,8 @@ export class ProductsService {
 
     await this.variantValueRepo.save(links);
     return {
-      ...variant,
-      values: [...variant.values, ...links],
+      variant: variant,
+      linkedValues: links.map((link) => link.attributeValue),
     }
   }
 
@@ -332,7 +342,7 @@ export class ProductsService {
     await this.productRepo.save(product);
     return {
       product: product.name,
-      images: images.map((img) => ({ url: img.url})),
+      images: images.map((img) => ({ url: img.url })),
     };
   }
 }

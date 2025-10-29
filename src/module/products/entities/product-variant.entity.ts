@@ -22,9 +22,12 @@ export class ProductVariant extends BaseEntity {
   @Column({ nullable: true, unique: true })
   barcode?: string;
 
+  // 💰 price → Selling price (سعر البيع للعميل)
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
 
+  // 🧾 costPrice → Latest purchase cost (آخر تكلفة شراء تم تسجيلها)
+  // يستخدم لتقدير تكلفة المنتج في التقارير والـ profit margin
   @Column({ name: 'cost_price', type: 'decimal', precision: 10, scale: 2 })
   costPrice: number;
 

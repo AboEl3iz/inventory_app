@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, BadRequestException, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, BadRequestException, UseGuards, Req, ParseUUIDPipe, HttpCode, HttpStatus } from '@nestjs/common';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
@@ -13,47 +13,79 @@ export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) {}
 
   /**
-   * Admin and branch managers can create a purchase
+   * Create new purchase order
+   * Only admins and managers can create purchases
    */
   @Post()
   @Roles(Role.admin, Role.manager)
-  async create(@Body() dto: CreatePurchaseDto, @Req() user: any) {
-    if (!dto.items?.length)
-      throw new BadRequestException('Purchase items are required');
-    return this.purchasesService.createPurchase(dto, user);
+  @HttpCode(HttpStatus.CREATED)
+  async create(@Body() dto: CreatePurchaseDto, @Req() req: any) {
+    if (!dto.items?.length) {
+      throw new BadRequestException('Purchase must contain at least one item');
+    }
+
+    const invalidItems = dto.items.filter(
+      (item) => item.quantity <= 0 || item.unitCost < 0,
+    );
+    if (invalidItems.length > 0) {
+      throw new BadRequestException(
+        'All items must have positive quantity and non-negative unit cost',
+      );
+    }
+
+    return this.purchasesService.createPurchase(dto, req.user);
   }
 
   /**
-   * Everyone (with valid JWT) can view purchases
+   * Get all purchases
+   * Non-admin users only see purchases from their branch
    */
   @Get()
   @CacheKey('all_purchases')
   @CacheTTL(60)
-  async findAll(@Req() user: any) {
-    return this.purchasesService.findAll(user);
-  }
-
-  @Get(':id')
-  @CacheTTL(60)
-  async findOne(@Param('id') id: string, @Req() user: any) {
-    return this.purchasesService.findOne(id, user);
+  async findAll(@Req() req: any) {
+    return this.purchasesService.findAll(req.user);
   }
 
   /**
-   * Only admins or branch managers can mark a purchase as completed
+   * Get purchase by ID
+   */
+  @Get(':id')
+  @CacheTTL(60)
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.purchasesService.findOne(id, req.user);
+  }
+
+  /**
+   * Complete purchase and update inventory
+   * This action triggers stock movement
    */
   @Patch(':id/complete')
   @Roles(Role.admin, Role.manager)
-  async complete(@Param('id') id: string, @Req() user: any) {
-    return this.purchasesService.completePurchase(id, user);
+  @HttpCode(HttpStatus.OK)
+  async complete(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.purchasesService.completePurchase(id, req.user);
   }
 
   /**
-   * Only admins can delete purchases
+   * Cancel a pending purchase
+   * Cannot cancel completed purchases
+   */
+  @Patch(':id/cancel')
+  @Roles(Role.admin, Role.manager)
+  @HttpCode(HttpStatus.OK)
+  async cancel(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.purchasesService.cancelPurchase(id, req.user);
+  }
+
+  /**
+   * Soft delete a purchase (Admin only)
+   * Cannot delete completed purchases
    */
   @Delete(':id')
   @Roles(Role.admin)
-  async remove(@Param('id') id: string, @Req() user: any) {
-    return this.purchasesService.remove(id, user);
+  @HttpCode(HttpStatus.OK)
+  async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.purchasesService.remove(id, req.user);
   }
 }

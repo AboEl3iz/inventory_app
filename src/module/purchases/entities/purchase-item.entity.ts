@@ -16,9 +16,13 @@ export class PurchaseItem extends BaseEntity {
   @Column({ type: 'int' })
   quantity: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+
+  // 🧮 unitCost → Actual purchase price per unit in this invoice
+  // (السعر الفعلي اللي اشترينا بيه المنتج في الفاتورة الحالية)
+  @Column({ type: 'decimal', precision: 10, scale: 2 }) 
   unitCost: number;
 
+  // 📦 subtotal → quantity × unitCost (إجمالي سعر هذا البند)
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   subtotal: number;
 }

@@ -4,9 +4,8 @@ import { EventsController } from './events.controller';
 import { StockListener } from './listener/stock.listener';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { InventoryModule } from '../inventory/inventory.module';
-import { WinstonModule } from 'nest-winston/dist/winston.module';
+import { WinstonModule } from 'nest-winston';
 import { PuchaseListener } from './listener/purchase.listener';
-
 import { InvoicesListener } from './listener/invoices.listener';
 import { BullModule } from '@nestjs/bullmq';
 
@@ -17,7 +16,7 @@ import { BullModule } from '@nestjs/bullmq';
     WinstonModule,
     EventEmitterModule.forRoot(),
     InventoryModule,
-    BullModule.registerQueue({ name: "LOW_STOCK_QUEUE" }),
+    BullModule.registerQueue({ name: "LOW_STOCK_QUEUE" } , { name: "PURCHASES_QUEUE" } , { name: "INVOICES_QUEUE" }),
   ],
 })
 export class EventsModule {}
