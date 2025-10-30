@@ -3,9 +3,10 @@ import { Inject } from "@nestjs/common";
 import { InventoryService } from "src/module/inventory/inventory.service";
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Job } from "bullmq";
-import { PURCHASE_CANCELLED , PURCHASE_COMPLETED } from "src/shared/event.constants";
+import { PURCHASE_CANCELLED, PURCHASE_COMPLETED } from "src/shared/event.constants";
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import sendEmail from "src/shared/mail/mailer";
 @Processor('PURCHASES_QUEUE')
 export class PuchaseListener extends WorkerHost {
     async process(job: Job, token?: string): Promise<any> {
@@ -29,15 +30,17 @@ export class PuchaseListener extends WorkerHost {
      * Handle purchase completion → Increase stock
      */
     async handlePurchaseCompleted(payload: {
-        purchaseId: string;
-        branchId: string;
-        items: { variantId: string; quantity: number }[];
-        user?: any;
+        purchaseId: string,
+        branchId: string,
+        items: { variantId: string; quantity: number; unitCost?: number }[],
+        user?: any,
     }) {
         this.logger.info(`📦 Purchase completed ${payload.purchaseId} → increasing stock`);
+
+        const errors: string[] = [];
+
         for (const it of payload.items) {
             try {
-                //{"purchaseId":"f734173f-f752-460c-b2ec-c500e7175aa8","branchId":"863c69a7-5166-4dad-ab79-cec961aaf34e","items":[{"variantId":"1c1386c1-a74d-4ad0-8b6d-6b94b76a3e07","quantity":3,"unitCost":"2000.00"}]}
                 await this.inventoryService.adjustStock(
                     payload.branchId,
                     it.variantId,
@@ -45,10 +48,44 @@ export class PuchaseListener extends WorkerHost {
                     payload.user,
                 );
             } catch (err) {
-                this.logger.error(
-                    `❌ Error adjusting stock for variant ${it.variantId} on purchase ${payload.purchaseId}: ${err.message}`,
-                );
+                const msg = `❌ Error adjusting stock for variant ${it.variantId} on purchase ${payload.purchaseId}: ${err.message}`;
+                this.logger.error(msg);
+                errors.push(msg);
             }
+        }
+
+        // ✅ بعد تعديل المخزون، نرسل الإيميل لو فيه user
+        if (payload.user?.email) {
+            try {
+                const totalCost = payload.items.reduce(
+                    (sum, i) => sum + (Number(i.unitCost) || 0) * i.quantity,
+                    0,
+                );
+
+                await sendEmail({
+                    to: payload.user.email,
+                    templete: 'purchase',
+                    data: {
+                        purchaseId: payload.purchaseId,
+                        branchName: payload.user.branch?.name || 'Unknown Branch',
+                        user: payload.user,
+                        items: payload.items.map(i => ({
+                            variantId: i.variantId,
+                            quantity: i.quantity,
+                            unitCost: Number(i.unitCost) || 0,
+                        })),
+                        totalCost,
+                    },
+                });
+
+                this.logger.info(`📨 Purchase completion email sent to ${payload.user.email}`);
+            } catch (emailErr) {
+                this.logger.error(`❌ Failed to send purchase email: ${emailErr.message}`);
+            }
+        }
+
+        if (errors.length) {
+            this.logger.warn(`⚠️ Some stock adjustments failed for purchase ${payload.purchaseId}`);
         }
     }
 
@@ -56,12 +93,15 @@ export class PuchaseListener extends WorkerHost {
      * Handle purchase cancellation → Decrease stock
      */
     async handlePurchaseCancelled(payload: {
-        purchaseId: string;
-        branchId: string;
-        items: { variantId: string; quantity: number }[];
-        user?: any;
+        purchaseId: string,
+        branchId: string,
+        items: { variantId: string; quantity: number }[],
+        user?: any,
     }) {
-        this.logger.info(`📦 Purchase cancelled ${payload.purchaseId} → decreasing stock`)
+        this.logger.info(`📦 Purchase cancelled ${payload.purchaseId} → decreasing stock`);
+
+        const errors: string[] = [];
+
         for (const it of payload.items) {
             try {
                 await this.inventoryService.adjustStock(
@@ -71,10 +111,34 @@ export class PuchaseListener extends WorkerHost {
                     payload.user,
                 );
             } catch (err) {
-                this.logger.error(
-                    `❌ Error adjusting stock for variant ${it.variantId} on purchase cancellation ${payload.purchaseId}: ${err.message}`,
-                );
+                const msg = `❌ Error adjusting stock for variant ${it.variantId} on purchase cancellation ${payload.purchaseId}: ${err.message}`;
+                this.logger.error(msg);
+                errors.push(msg);
             }
+        }
+
+        // ✅ بعد تقليل الكميات، نرسل إيميل تنبيهي للمستخدم (لو عنده إيميل)
+        if (payload.user?.email) {
+            try {
+                await sendEmail({
+                    to: payload.user.email,
+                    templete: 'purchase-cancelled',
+                    data: {
+                        purchaseId: payload.purchaseId,
+                        branchName: payload.user.branch?.name || 'Unknown Branch',
+                        user: payload.user,
+                        items: payload.items,
+                    },
+                });
+
+                this.logger.info(`📨 Purchase cancellation email sent to ${payload.user.email}`);
+            } catch (emailErr) {
+                this.logger.error(`❌ Failed to send purchase cancellation email: ${emailErr.message}`);
+            }
+        }
+
+        if (errors.length) {
+            this.logger.warn(`⚠️ Some stock decrements failed for purchase ${payload.purchaseId}`);
         }
     }
 }
