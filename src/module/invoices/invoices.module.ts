@@ -8,6 +8,7 @@ import { ProductVariant } from '../products/entities/product-variant.entity';
 import { InvoiceItem } from './entities/invoice_items.entity';
 import { InventoryModule } from '../inventory/inventory.module';
 import { BullModule } from '@nestjs/bullmq';
+import { User } from '../users/entities/user.entity';
 
 @Module({
   controllers: [InvoicesController],
@@ -15,7 +16,7 @@ import { BullModule } from '@nestjs/bullmq';
   imports: [
     InventoryModule,
     TypeOrmModule.forFeature([
-      InvoiceItem , ProductVariant,Invoice,Branch
+      InvoiceItem , ProductVariant,Invoice,Branch,User
     ]),
     BullModule.registerQueue({ name: "INVOICES_QUEUE" }),
   ],

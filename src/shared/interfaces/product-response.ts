@@ -1,50 +1,216 @@
-import { Product } from "src/module/products/entities/product.entity";
+export interface ProductResponse {
+  id: string;
+  name: string;
+  description: string;
+  brand: string;
+  basePrice: number;
+  isActive: boolean;
 
-interface IFilterProducts {
-    data: Product[];
-    total: number;
-    page: number;
-    limit: number;
+  categoryId: string;
+  categoryName: string;
+  supplierId: string;
+  supplierName: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-interface IStats {
-    categoryId: any;
-    categoryName: any;
-    productCount: number;
+// Product List Response
+export interface ProductListResponse {
+  data: Array<{
+    id: string;
+    name: string;
+    brand: string;
+    basePrice: number;
+    isActive: boolean;
+    category: {
+      id: string;
+      name: string;
+    };
+    supplier: {
+      id: string;
+      name: string;
+    };
+    variantsCount: number;
+  }>;
+  total: number;
+  page: number;
+  limit: number;
 }
 
-interface IVariant {
+// Flat List Response
+export interface ProductFlatListResponse {
+  id: string;
+  name: string;
+  basePrice: number;
+}
+
+// Stats Response
+export interface ProductStatsResponse {
+  total: number;
+  active: number;
+  inactive: number;
+}
+
+// Search Response
+export interface ProductSearchResponse {
+  id: string;
+  name: string;
+  brand: string;
+  basePrice: number;
+  
+}
+
+// Product Detail Response
+export interface ProductDetailResponse {
+  id: string;
+  name: string;
+  description: string;
+  brand: string;
+  basePrice: number;
+  isActive: boolean;
+  category: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  supplier: {
+    id: string;
+    name: string;
+    contactPerson: string;
+    phone: string;
+    email: string;
+  };
+  variants: Array<{
     id: string;
     sku: string;
-    price: number | null;
-    BasePrice: number;
+    barcode: string;
+    price: number;
     costPrice: number;
-    stockQuantity: number;
     isActive: boolean;
-    attributes: unknown[];
+    valuesCount: number;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-interface ILinkedVariant {
-    variantId: string;
-    linkedValues: {
-        id: string;
-        value: string;
-        attribute: {
-            id: string;
-            name: string;
-        };
-    }[];
+// Delete/Restore Response
+export interface ProductActionResponse {
+  status: 'deleted' | 'restored';
+  id: string;
 }
 
-interface IGetVariantResponse {
-    variantId: string;
+// Variant Response
+export interface VariantResponse {
+  id: string;
+  sku: string;
+  barcode: string;
+  price: number;
+  costPrice: number;
+  isActive: boolean;
+  productId: string;
+  productName: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Add Variants Response
+export interface AddVariantsResponse {
+  product: string;
+  variants: Array<{
+    id: string;
     sku: string;
-    productName: string;
-    attributes: {
-        id: string;
-        name: string;
-        values: any[];
-    }[];
+    barcode: string;
+    price: number;
+    costPrice: number;
+    isActive: boolean;
+  }>;
 }
 
-export type { IFilterProducts , IStats , IVariant , ILinkedVariant , IGetVariantResponse };
+// Get Variants Response
+export interface GetVariantsResponse {
+  id: string;
+  sku: string;
+  barcode: string;
+  price: number;
+  costPrice: number;
+  isActive: boolean;
+  values: Array<{
+    id: string;
+    attributeName: string;
+    value: string;
+  }>;
+}
+
+// Attribute Response
+export interface AttributeResponse {
+  id: string;
+  name: string;
+  categoryId: string;
+  categoryName: string;
+  createdAt: Date;
+}
+
+// Attribute Value Response
+export interface AttributeValueResponse {
+  id: string;
+  value: string;
+  attributeId: string;
+  attributeName: string;
+  productId: string;
+  createdAt: Date;
+}
+
+// Get Attributes Response
+export interface GetAttributesResponse {
+  id: string;
+  value: string;
+  attribute: {
+    id: string;
+    name: string;
+  };
+}
+
+// Get Attributes By Category Response
+export interface GetAttributesByCategoryResponse {
+  id: string;
+  name: string;
+  values: Array<{
+    id: string;
+    value: string;
+  }>;
+}
+
+// Link Variant Values Response
+export interface LinkVariantValuesResponse {
+  variant: {
+    id: string;
+    sku: string;
+    price: number;
+  };
+  linkedValues: Array<{
+    id: string;
+    value: string;
+    attributeId: string;
+  }>;
+}
+
+// Get Variant Values Response
+export interface GetVariantValuesResponse {
+  id: string;
+  attributeValue: {
+    id: string;
+    value: string;
+    attribute: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
+// Upload Images Response
+export interface UploadImagesResponse {
+  product: string;
+  images: Array<{
+    url: string;
+  }>;
+}

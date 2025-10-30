@@ -13,6 +13,7 @@ import { PurchaseItem } from './entities/purchase-item.entity';
 import { User } from '../users/entities/user.entity';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { InjectQueue } from '@nestjs/bullmq';
+import { CancelPurchaseResponse, CompletePurchaseResponse, CreatePurchaseResponse, DeletePurchaseResponse, PurchaseDetailResponse, PurchaseListItemResponse } from 'src/shared/interfaces/purchases-response';
 
 @Injectable()
 export class PurchasesService {
@@ -27,7 +28,7 @@ export class PurchasesService {
     @InjectQueue('PURCHASES_QUEUE') private purchasesQueue,
   ) { }
 
-  async createPurchase(dto: CreatePurchaseDto, user: any) {
+   async createPurchase(dto: CreatePurchaseDto, user: any): Promise<CreatePurchaseResponse> {
     // التحقق من صلاحية إنشاء مشتريات في الفرع
     if (user.role !== Role.admin && dto.branchId !== user.branchId) {
       throw new ForbiddenException('Cannot create purchase for another branch');
@@ -46,7 +47,7 @@ export class PurchasesService {
       const [supplier, branch, variants] = await Promise.all([
         manager.findOne(Supplier, { where: { id: dto.supplierId } }),
         manager.findOne(Branch, { where: { id: dto.branchId } }),
-        manager.find(ProductVariant, { where: { id: In(variantIds) } }),
+        manager.find(ProductVariant, { where: { id: In(variantIds) }, relations: ['product'] }),
       ]);
 
       // التحقق من وجود المورد والفرع
@@ -123,15 +124,38 @@ export class PurchasesService {
         await manager.update(ProductVariant, { id: item.variant.id }, { costPrice: item.unitCost });
       }
 
-      // إرجاع الفاتورة مع العناصر
+      // إرجاع الفاتورة مع العناصر بصيغة الـ Response
       return {
-        ...savedPurchase,
-        items: savedItems,
+        id: savedPurchase.id,
+        purchaseNumber: savedPurchase.purchaseNumber,
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        branchId: branch.id,
+        branchName: branch.name,
+        userId: user.id,
+        userName: user.name,
+        subtotal: savedPurchase.subtotal,
+        discount: savedPurchase.discount,
+        tax: savedPurchase.tax,
+        totalAmount: savedPurchase.totalAmount,
+        status: savedPurchase.status,
+        notes: savedPurchase.notes,
+        items: savedItems.map(item => ({
+          id: item.id,
+          variantId: item.variant.id,
+          sku: item.variant.sku,
+          productName: item.variant.product.name,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          subtotal: item.subtotal,
+          createdAt: item.createdAt,
+        })),
+        createdAt: savedPurchase.createdAt,
       };
     });
   }
 
-  async completePurchase(id: string, user: any) {
+  async completePurchase(id: string, user: any): Promise<CompletePurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['items', 'items.variant', 'branch', 'supplier'],
@@ -172,10 +196,23 @@ export class PurchasesService {
       })),
     });
 
-    return saved;
+    return {
+      id: saved.id,
+      purchaseNumber: saved.purchaseNumber,
+      supplierId: purchase.supplier.id,
+      supplierName: purchase.supplier.name,
+      branchId: purchase.branch.id,
+      branchName: purchase.branch.name,
+      status: 'completed',
+      totalAmount: saved.totalAmount,
+      receivedAt: saved.receivedAt,
+      itemsCount: purchase.items.length,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
   }
 
-  async findAll(user: any) {
+  async findAll(user: any): Promise<PurchaseListItemResponse[]> {
     const query = this.purchaseRepo
       .createQueryBuilder('purchase')
       .leftJoinAndSelect('purchase.supplier', 'supplier')
@@ -191,10 +228,26 @@ export class PurchasesService {
       query.andWhere('branch.id = :branchId', { branchId: user.branchId });
     }
 
-    return query.getMany();
+    const purchases = await query.getMany();
+
+    return purchases.map(purchase => ({
+      id: purchase.id,
+      purchaseNumber: purchase.purchaseNumber,
+      supplierName: purchase.supplier.name,
+      branchName: purchase.branch.name,
+      userName: purchase.user.name,
+      subtotal: purchase.subtotal,
+      discount: purchase.discount,
+      tax: purchase.tax,
+      totalAmount: purchase.totalAmount,
+      status: purchase.status,
+      itemsCount: purchase.items.length,
+      receivedAt: purchase.receivedAt,
+      createdAt: purchase.createdAt,
+    }));
   }
 
-  async findOne(id: string, user: any) {
+  async findOne(id: string, user: any): Promise<PurchaseDetailResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: [
@@ -216,13 +269,61 @@ export class PurchasesService {
       throw new ForbiddenException('Access denied to this purchase');
     }
 
-    return purchase;
+    return {
+      id: purchase.id,
+      purchaseNumber: purchase.purchaseNumber,
+      supplier: {
+        id: purchase.supplier.id,
+        name: purchase.supplier.name,
+        contactPerson: purchase.supplier.contactPerson,
+        phone: purchase.supplier.phone,
+        email: purchase.supplier.email,
+      },
+      branch: {
+        id: purchase.branch.id,
+        name: purchase.branch.name,
+        address: purchase.branch.address,
+        phone: purchase.branch.phone,
+      },
+      user: {
+        id: purchase.user.id,
+        name: purchase.user.name,
+        email: purchase.user.email,
+        role: purchase.user.role,
+      },
+      items: purchase.items.map(item => ({
+        id: item.id,
+        variant: {
+          id: item.variant.id,
+          sku: item.variant.sku,
+          barcode: item.variant.barcode ?? '',
+          price: item.variant.price,
+          product: {
+            id: item.variant.product.id,
+            name: item.variant.product.name,
+            brand: item.variant.product.brand,
+          },
+        },
+        quantity: item.quantity,
+        unitCost: item.unitCost,
+        subtotal: item.subtotal,
+      })),
+      subtotal: purchase.subtotal,
+      discount: purchase.discount,
+      tax: purchase.tax,
+      totalAmount: purchase.totalAmount,
+      status: purchase.status,
+      receivedAt: purchase.receivedAt,
+      notes: purchase.notes,
+      createdAt: purchase.createdAt,
+      updatedAt: purchase.updatedAt,
+    };
   }
 
-  async cancelPurchase(id: string, user: any) {
+  async cancelPurchase(id: string, user: any): Promise<CancelPurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
-      relations: ['branch'],
+      relations: ['branch', 'items', 'items.variant'],
     });
 
     if (!purchase) {
@@ -246,6 +347,7 @@ export class PurchasesService {
     }
 
     purchase.status = 'cancelled';
+    
     await this.purchasesQueue.add(PURCHASE_CANCELLED, {
       purchaseId: id,
       branchId: purchase.branch.id,
@@ -253,13 +355,22 @@ export class PurchasesService {
       items: purchase.items.map((item) => ({
         variantId: item.variant.id,
         quantity: item.quantity,
-        unitCost: item.unitCost, // مهم للتتبع التكاليف
+        unitCost: item.unitCost,
       })),
     });
-    return this.purchaseRepo.save(purchase);
+    
+    const saved = await this.purchaseRepo.save(purchase);
+
+    return {
+      id: saved.id,
+      purchaseNumber: saved.purchaseNumber,
+      status: 'cancelled',
+      totalAmount: saved.totalAmount,
+      updatedAt: saved.updatedAt,
+    };
   }
 
-  async remove(id: string, user: any) {
+  async remove(id: string, user: any): Promise<DeletePurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['branch'],

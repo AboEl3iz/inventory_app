@@ -12,6 +12,7 @@ import { STOCK_ADJUSTED } from 'src/shared/event.constants';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { StockMovement } from '../stock/entities/stock.entity';
+import { AdjustStockResponse, CreateInventoryResponse, InventoryDetailResponse, InventoryListItemResponse, LowStockItemResponse, TransferStockResponse, UpdateInventoryResponse } from 'src/shared/interfaces/inventory-response';
 @Injectable()
 export class InventoryService {
   constructor(
@@ -23,7 +24,7 @@ export class InventoryService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  private cacheKey(branchId?: string) {
+   private cacheKey(branchId?: string) {
     return branchId ? `inventory:branch:${branchId}` : 'inventory:all';
   }
 
@@ -67,11 +68,26 @@ export class InventoryService {
     await this.movementRepo.save(movement);
   }
 
-  async create(dto: CreateInventoryDto, user: any) {
+  private getStockStatus(quantity: number, minThreshold: number): 'out_of_stock' | 'low_stock' | 'in_stock' | 'overstocked' {
+    if (quantity === 0) return 'out_of_stock';
+    if (quantity <= minThreshold) return 'low_stock';
+    if (quantity > minThreshold * 10) return 'overstocked';
+    return 'in_stock';
+  }
+
+  async create(dto: CreateInventoryDto, user: any): Promise<CreateInventoryResponse> {
     this.checkBranchAccess(user, dto.branchId);
 
     const branch = await this.findBranchOrThrow(dto.branchId);
     const variant = await this.findVariantOrThrow(dto.variantId);
+
+    // Load variant with product relation
+    const variantWithProduct = await this.variantRepo.findOne({
+      where: { id: variant.id },
+      relations: ['product'],
+    });
+
+    if (!variantWithProduct) throw new NotFoundException(`Variant ${variant.id} not found`);
 
     let record = await this.invRepo.findOne({
       where: { branch: { id: branch.id }, variant: { id: variant.id } },
@@ -104,17 +120,34 @@ export class InventoryService {
     });
 
     await this.invalidateCaches(branch.id);
-    return saved;
+
+    return {
+      id: saved.id,
+      branchId: branch.id,
+      branchName: branch.name,
+      variantId: variant.id,
+      variantSku: variantWithProduct.sku,
+      productName: variantWithProduct.product.name,
+      quantity: saved.quantity,
+      minThreshold: saved.minThreshold,
+      lowStockAlertSent: saved.lowStockAlertSent,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
   }
 
-  async adjustStock(branchId: string, variantId: string, qtyChange: number, user: any) {
+  async adjustStock(branchId: string, variantId: string, qtyChange: number, user: any): Promise<AdjustStockResponse> {
     this.checkBranchAccess(user, branchId);
 
     if (user.role === Role.cashier && qtyChange > 0)
       throw new ForbiddenException('Cashier cannot manually increase stock');
 
     const branch = await this.findBranchOrThrow(branchId);
-    const variant = await this.findVariantOrThrow(variantId);
+    const variant = await this.variantRepo.findOne({
+      where: { id: variantId },
+      relations: ['product'],
+    });
+    if (!variant) throw new NotFoundException(`Variant ${variantId} not found`);
 
     let inv = await this.invRepo.findOne({
       where: { branch: { id: branch.id }, variant: { id: variant.id } },
@@ -141,10 +174,29 @@ export class InventoryService {
     });
 
     await this.invalidateCaches(branch.id);
-    return saved;
+
+    return {
+      id: saved.id,
+      branchId: branch.id,
+      branchName: branch.name,
+      variantId: variant.id,
+      variantSku: variant.sku,
+      productName: variant.product.name,
+      quantityBefore: before,
+      quantityAfter: saved.quantity,
+      quantityChange: qtyChange,
+      minThreshold: saved.minThreshold,
+      updatedAt: saved.updatedAt,
+    };
   }
 
-  async transferStock(fromBranchId: string, toBranchId: string, variantId: string, qty: number, user: any) {
+  async transferStock(
+    fromBranchId: string,
+    toBranchId: string,
+    variantId: string,
+    qty: number,
+    user: any
+  ): Promise<TransferStockResponse> {
     if (![Role.admin, Role.manager].includes(user.role))
       throw new ForbiddenException('Only admin or manager can transfer stock');
 
@@ -205,43 +257,127 @@ export class InventoryService {
       await this.invalidateCaches(fromBranchId);
       await this.invalidateCaches(toBranchId);
 
-      return { from, to };
+      return {
+        from: {
+          id: from.id,
+          branchId: from.branch.id,
+          branchName: from.branch.name,
+          variantId: from.variant.id,
+          variantSku: from.variant.sku,
+          quantityBefore: beforeFrom,
+          quantityAfter: from.quantity,
+        },
+        to: {
+          id: to.id,
+          branchId: to.branch.id,
+          branchName: to.branch.name,
+          variantId: to.variant.id,
+          variantSku: to.variant.sku,
+          quantityBefore: beforeTo,
+          quantityAfter: to.quantity,
+        },
+        transferredQuantity: qty,
+      };
     });
   }
 
-  async findAll(user: any, branchId?: string) {
+  async findAll(user: any, branchId?: string): Promise<InventoryListItemResponse[]> {
     if (user.role !== Role.admin) branchId = user.branchId;
     const key = this.cacheKey(branchId);
     const cached = await this.cacheManager.get<Inventory[]>(key);
-    if (cached) return cached;
+    
+    let data: Inventory[];
+    if (cached) {
+      data = cached;
+    } else {
+      const where = branchId ? { branch: { id: branchId } } : {};
+      data = await this.invRepo.find({
+        where,
+        relations: ['branch', 'variant', 'variant.product'],
+      });
+      await this.cacheManager.set(key, data, 300);
+    }
 
-    const where = branchId ? { branch: { id: branchId } } : {};
-    const data = await this.invRepo.find({
-      where,
-      relations: ['branch', 'variant', 'variant.product'],
-    });
-
-    await this.cacheManager.set(key, data, 300);
-    return data;
+    return data.map(inv => ({
+      id: inv.id,
+      branch: {
+        id: inv.branch.id,
+        name: inv.branch.name,
+        address: inv.branch.address,
+      },
+      variant: {
+        id: inv.variant.id,
+        sku: inv.variant.sku,
+        barcode: inv.variant.barcode ?? '',
+        price: inv.variant.price,
+        costPrice: inv.variant.costPrice,
+        product: {
+          id: inv.variant.product.id,
+          name: inv.variant.product.name,
+          brand: inv.variant.product.brand,
+        },
+      },
+      quantity: inv.quantity,
+      minThreshold: inv.minThreshold,
+      lowStockAlertSent: inv.lowStockAlertSent,
+      lastAlertSentAt: inv.lastAlertSentAt,
+      isLowStock: inv.quantity <= inv.minThreshold,
+      createdAt: inv.createdAt,
+      updatedAt: inv.updatedAt,
+    }));
   }
 
-  async findOne(id: string, user: any) {
+  async findOne(id: string, user: any): Promise<InventoryDetailResponse> {
     const inv = await this.invRepo.findOne({
       where: { id },
       relations: ['branch', 'variant', 'variant.product'],
     });
     if (!inv) throw new NotFoundException('Inventory not found');
     this.checkBranchAccess(user, inv.branch.id);
-    return inv;
+
+    return {
+      id: inv.id,
+      branch: {
+        id: inv.branch.id,
+        name: inv.branch.name,
+        address: inv.branch.address,
+        phone: inv.branch.phone,
+        isActive: inv.branch.isActive,
+      },
+      variant: {
+        id: inv.variant.id,
+        sku: inv.variant.sku,
+        barcode: inv.variant.barcode ?? '',
+        price: inv.variant.price,
+        costPrice: inv.variant.costPrice,
+        isActive: inv.variant.isActive,
+        product: {
+          id: inv.variant.product.id,
+          name: inv.variant.product.name,
+          description: inv.variant.product.description,
+          brand: inv.variant.product.brand,
+          basePrice: inv.variant.product.basePrice,
+        },
+      },
+      quantity: inv.quantity,
+      minThreshold: inv.minThreshold,
+      lowStockAlertSent: inv.lowStockAlertSent,
+      lastAlertSentAt: inv.lastAlertSentAt,
+      isLowStock: inv.quantity <= inv.minThreshold,
+      stockStatus: this.getStockStatus(inv.quantity, inv.minThreshold),
+      createdAt: inv.createdAt,
+      updatedAt: inv.updatedAt,
+    };
   }
 
-  async update(id: string, dto: UpdateInventoryDto, user: any) {
+  async update(id: string, dto: UpdateInventoryDto, user: any): Promise<UpdateInventoryResponse> {
     const record = await this.invRepo.findOne({
       where: { id },
-      relations: ['branch'],
+      relations: ['branch', 'variant', 'variant.product'],
     });
     if (!record) throw new NotFoundException('Inventory not found');
     this.checkBranchAccess(user, record.branch.id);
+    
     if(dto.quantity && dto.quantity < record.minThreshold){
       throw new BadRequestException('Quantity cannot be less than minimum threshold');
     }
@@ -249,10 +385,21 @@ export class InventoryService {
     Object.assign(record, dto);
     const saved = await this.invRepo.save(record);
     await this.invalidateCaches(record.branch?.id);
-    return saved;
+
+    return {
+      id: saved.id,
+      branchId: record.branch.id,
+      branchName: record.branch.name,
+      variantId: record.variant.id,
+      variantSku: record.variant.sku,
+      quantity: saved.quantity,
+      minThreshold: saved.minThreshold,
+      lowStockAlertSent: saved.lowStockAlertSent,
+      updatedAt: saved.updatedAt,
+    };
   }
 
-  async getLowStock(user: any, threshold = 5) {
+  async getLowStock(user: any, threshold = 5): Promise<LowStockItemResponse[]> {
     const query = this.invRepo
       .createQueryBuilder('inv')
       .leftJoinAndSelect('inv.variant', 'v')
@@ -263,14 +410,72 @@ export class InventoryService {
     if (user.role !== Role.admin)
       query.andWhere('b.id = :branchId', { branchId: user.branchId });
 
-    return query.getMany();
+    const items = await query.getMany();
+
+    return items.map(inv => ({
+      id: inv.id,
+      branch: {
+        id: inv.branch.id,
+        name: inv.branch.name,
+      },
+      variant: {
+        id: inv.variant.id,
+        sku: inv.variant.sku,
+        barcode: inv.variant.barcode ?? '',
+        product: {
+          id: inv.variant.product.id,
+          name: inv.variant.product.name,
+          brand: inv.variant.product.brand,
+        },
+      },
+      quantity: inv.quantity,
+      minThreshold: inv.minThreshold,
+      stockDeficit: inv.minThreshold - inv.quantity,
+      lastAlertSentAt: inv.lastAlertSentAt,
+    }));
   }
 
-  async findOneByVarientAndBranch(variantId: string, branchId: string) {
-    return this.invRepo.findOne({
+  async findOneByVarientAndBranch(variantId: string, branchId: string): Promise<InventoryDetailResponse | null> {
+    const inv = await this.invRepo.findOne({
       where: { variant: { id: variantId }, branch: { id: branchId } },
       relations: ['branch', 'variant', 'variant.product'],
     });
+
+    if (!inv) return null;
+
+    return {
+      id: inv.id,
+      branch: {
+        id: inv.branch.id,
+        name: inv.branch.name,
+        address: inv.branch.address,
+        phone: inv.branch.phone,
+        isActive: inv.branch.isActive,
+      },
+      variant: {
+        id: inv.variant.id,
+        sku: inv.variant.sku,
+        barcode: inv.variant.barcode ?? '',
+        price: inv.variant.price,
+        costPrice: inv.variant.costPrice,
+        isActive: inv.variant.isActive,
+        product: {
+          id: inv.variant.product.id,
+          name: inv.variant.product.name,
+          description: inv.variant.product.description,
+          brand: inv.variant.product.brand,
+          basePrice: inv.variant.product.basePrice,
+        },
+      },
+      quantity: inv.quantity,
+      minThreshold: inv.minThreshold,
+      lowStockAlertSent: inv.lowStockAlertSent,
+      lastAlertSentAt: inv.lastAlertSentAt,
+      isLowStock: inv.quantity <= inv.minThreshold,
+      stockStatus: this.getStockStatus(inv.quantity, inv.minThreshold),
+      createdAt: inv.createdAt,
+      updatedAt: inv.updatedAt,
+    };
   }
 
   private async invalidateCaches(branchId?: string) {

@@ -16,11 +16,11 @@ import { CreateVariantDto } from './dto/create-variant.dto';
 import { CreateProductAttributeValueDto } from './dto/create-product-attribute-value.dto';
 import { UpdateVariantDto } from './dto/update-variant.dto';
 import { CreateProductAttributeDto } from './dto/create-product-attribute.dto';
-import { IFilterProducts, IGetVariantResponse, ILinkedVariant, IStats, IVariant } from 'src/shared/interfaces/product-response';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { ProductImage } from './entities/product-images.entity';
 import { deleteMultipleFromCloudinary, uploadImageToCloudinary, uploadMultipleImagesToCloudinary } from 'src/shared/cloudinary';
 import { UploadApiResponse } from 'cloudinary';
+import { AddVariantsResponse, AttributeResponse, AttributeValueResponse, GetAttributesByCategoryResponse, GetAttributesResponse, GetVariantsResponse, GetVariantValuesResponse, LinkVariantValuesResponse, ProductActionResponse, ProductDetailResponse, ProductFlatListResponse, ProductListResponse, ProductResponse, ProductSearchResponse, ProductStatsResponse, UploadImagesResponse, VariantResponse } from 'src/shared/interfaces/product-response';
 @Injectable()
 export class ProductsService {
   constructor(
@@ -43,9 +43,9 @@ export class ProductsService {
 
   ) { }
 
-  // ======================= BASIC CRUD =======================
+ // ======================= BASIC CRUD =======================
 
-  async create(dto: CreateProductDto, user: any) {
+  async create(dto: CreateProductDto, user: any): Promise<ProductResponse> {
     if (user.role === Role.cashier)
       throw new ForbiddenException('Cashier cannot create products.');
 
@@ -60,7 +60,22 @@ export class ProductsService {
       category,
       supplier,
     });
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+
+    return {
+      id: saved.id,
+      name: saved.name,
+      description: saved.description,
+      brand: saved.brand,
+      basePrice: saved.basePrice,
+      isActive: saved.isActive,
+      categoryId: category.id,
+      categoryName: category.name,
+      supplierId: supplier.id,
+      supplierName: supplier.name,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
   }
 
   async findAll(
@@ -69,7 +84,7 @@ export class ProductsService {
     search?: string,
     categoryId?: string,
     user?: any,
-  ) {
+  ): Promise<ProductListResponse> {
     const qb = this.productRepo
       .createQueryBuilder('product')
       .leftJoinAndSelect('product.category', 'category')
@@ -88,10 +103,32 @@ export class ProductsService {
       qb.andWhere('product.categoryId = :categoryId', { categoryId });
 
     qb.skip((page - 1) * limit).take(limit);
-    return qb.getManyAndCount();
+    const [products, total] = await qb.getManyAndCount();
+
+    return {
+      data: products.map(product => ({
+        id: product.id,
+        name: product.name,
+        brand: product.brand,
+        basePrice: product.basePrice,
+        isActive: product.isActive,
+        category: {
+          id: product.category.id,
+          name: product.category.name,
+        },
+        supplier: {
+          id: product.supplier.id,
+          name: product.supplier.name,
+        },
+        variantsCount: product.variants.length,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
-  async flatList(user: any) {
+  async flatList(user: any): Promise<ProductFlatListResponse[]> {
     const where =
       user.role === Role.admin
         ? {}
@@ -99,7 +136,7 @@ export class ProductsService {
     return this.productRepo.find({ where, select: ['id', 'name', 'basePrice'] });
   }
 
-  async stats(user: any) {
+  async stats(user: any): Promise<ProductStatsResponse> {
     if (user.role === Role.cashier)
       throw new ForbiddenException('Cashier cannot view stats.');
 
@@ -119,7 +156,7 @@ export class ProductsService {
     return { total, active, inactive };
   }
 
-  async search(name: string, user: any) {
+  async search(name: string, user: any): Promise<ProductSearchResponse[]> {
     const where =
       user.role === Role.admin
         ? { name: ILike(`%${name}%`) }
@@ -128,10 +165,17 @@ export class ProductsService {
           branch: { id: user.branchId },
           isActive: true,
         };
-    return this.productRepo.find({ where, take: 10 });
+    const products = await this.productRepo.find({ where, take: 10 });
+
+    return products.map(product => ({
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      basePrice: product.basePrice,
+        }));
   }
 
-  async findByCategory(categoryId: string, user: any) {
+  async findByCategory(categoryId: string, user: any): Promise<ProductSearchResponse[]> {
     const where =
       user.role === Role.admin
         ? { category: { id: categoryId } }
@@ -139,35 +183,96 @@ export class ProductsService {
           category: { id: categoryId },
           branch: { id: user.branchId },
         };
-    return this.productRepo.find({ where, relations: ['variants'] });
+    const products = await this.productRepo.find({ where, relations: ['variants'] });
+
+    return products.map(product => ({
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      basePrice: product.basePrice,
+    }));
   }
 
-  async findOne(id: string, user: any) {
+  async findOne(id: string, user: any): Promise<ProductDetailResponse> {
     const product = await this.productRepo.findOne({
       where: { id },
       relations: ['category', 'supplier', 'variants', 'variants.values'],
     });
     if (!product) throw new NotFoundException('Product not found');
 
-
-    return product;
+    return {
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      brand: product.brand,
+      basePrice: product.basePrice,
+      isActive: product.isActive,
+      category: {
+        id: product.category.id,
+        name: product.category.name,
+        description: product.category.description,
+      },
+      supplier: {
+        id: product.supplier.id,
+        name: product.supplier.name,
+        contactPerson: product.supplier.contactPerson,
+        phone: product.supplier.phone,
+        email: product.supplier.email,
+      },
+      variants: product.variants.map(variant => ({
+        id: variant.id,
+        sku: variant.sku,
+        barcode: variant.barcode ?? '',
+        price: variant.price,
+        costPrice: variant.costPrice,
+        isActive: variant.isActive,
+        valuesCount: variant.values?.length || 0,
+      })),
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    };
   }
 
-  async update(id: string, dto: UpdateProductDto, user: any) {
-    const product = await this.findOne(id, user);
+  async update(id: string, dto: UpdateProductDto, user: any): Promise<ProductResponse> {
+    const product = await this.productRepo.findOne({
+      where: { id },
+      relations: ['category', 'supplier'],
+    });
+    if (!product) throw new NotFoundException('Product not found');
+    
     if (user.role === Role.cashier)
       throw new ForbiddenException('Cashier cannot update products.');
 
     Object.assign(product, dto);
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+
+    return {
+      id: saved.id,
+      name: saved.name,
+      description: saved.description,
+      brand: saved.brand,
+      basePrice: saved.basePrice,
+      isActive: saved.isActive,
+      
+      categoryId: saved.category.id,
+      categoryName: saved.category.name,
+      supplierId: saved.supplier.id,
+      supplierName: saved.supplier.name,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
   }
 
-  async remove(id: string, user: any) {
+  async remove(id: string, user: any): Promise<ProductActionResponse> {
     if (user.role !== Role.admin)
       throw new ForbiddenException('Only admin can delete products.');
 
-    const product = await this.productRepo.findOneBy({ id });
+    const product = await this.productRepo.findOne({
+      where: { id },
+      relations: ['images'],
+    });
     if (!product) throw new NotFoundException('Product not found');
+    
     await this.productRepo.softRemove(product);
     await this.productImageRepo.delete({ product: { id: product.id } });
     await deleteMultipleFromCloudinary(
@@ -176,7 +281,7 @@ export class ProductsService {
     return { status: 'deleted', id };
   }
 
-  async restore(id: string, user: any) {
+  async restore(id: string, user: any): Promise<ProductActionResponse> {
     if (user.role !== Role.admin)
       throw new ForbiddenException('Only admin can restore products.');
 
@@ -186,45 +291,80 @@ export class ProductsService {
 
   // ======================= VARIANTS =======================
 
-  async addVariants(productId: string, dtos: CreateVariantDto[], user: any) {
-    const product = await this.findOne(productId, user);
+  async addVariants(productId: string, dtos: CreateVariantDto[], user: any): Promise<AddVariantsResponse> {
+    const product = await this.productRepo.findOne({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Product not found');
+    
     if (user.role === Role.cashier)
       throw new ForbiddenException('Cashier cannot add variants.');
 
     const variants = dtos.map((dto) =>
       this.variantRepo.create({ ...dto, product }),
     );
-    await this.variantRepo.save(variants);
+    const saved = await this.variantRepo.save(variants);
+    
     return {
       product: product.name,
-      variants: variants,
-    }
+      variants: saved.map(variant => ({
+        id: variant.id,
+        sku: variant.sku,
+        barcode: variant.barcode ?? '',
+        price: variant.price,
+        costPrice: variant.costPrice,
+        isActive: variant.isActive,
+      })),
+    };
   }
 
-  async getVariants(productId: string, user: any) {
-    await this.findOne(productId, user);
-   return this.variantRepo.find({
+  async getVariants(productId: string, user: any): Promise<GetVariantsResponse[]> {
+    const product = await this.productRepo.findOne({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Product not found');
+    
+    const variants = await this.variantRepo.find({
       where: { product: { id: productId } },
-      relations: ['values', 'values.attribute' , ''],
+      relations: ['values', 'values.attributeValue', 'values.attributeValue.attribute'],
     });
 
-  
+    return variants.map(variant => ({
+      id: variant.id,
+      sku: variant.sku,
+      barcode: variant.barcode ?? '',
+      price: variant.price,
+      costPrice: variant.costPrice,
+      isActive: variant.isActive,
+      values: variant.values?.map(vv => ({
+        id: vv.id,
+        attributeName: vv.attributeValue.attribute.name,
+        value: vv.attributeValue.value,
+      })) || [],
+    }));
   }
 
-  async updateVariant(variantId: string, dto: UpdateVariantDto, user: any) {
+  async updateVariant(variantId: string, dto: UpdateVariantDto, user: any): Promise<VariantResponse> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
-      relations: ['product', 'product.branch'],
+      relations: ['product'],
     });
     if (!variant) throw new NotFoundException('Variant not found');
 
-
-
     Object.assign(variant, dto);
-    return this.variantRepo.save(variant);
+    const saved = await this.variantRepo.save(variant);
+
+    return {
+      id: saved.id,
+      sku: saved.sku,
+      barcode: saved.barcode ?? '',
+      price: saved.price,
+      costPrice: saved.costPrice,
+      isActive: saved.isActive,
+      productId: variant.product.id,
+      productName: variant.product.name,
+      createdAt: saved.createdAt,
+      updatedAt: saved.updatedAt,
+    };
   }
 
-  async deleteVariant(variantId: string, user: any) {
+  async deleteVariant(variantId: string, user: any): Promise<ProductActionResponse> {
     if (user.role !== Role.admin)
       throw new ForbiddenException('Only admin can delete variants.');
 
@@ -236,7 +376,7 @@ export class ProductsService {
 
   // ======================= ATTRIBUTES =======================
 
-  async addAttribute(dto: CreateProductAttributeDto, user: any) {
+  async addAttribute(dto: CreateProductAttributeDto, user: any): Promise<AttributeResponse> {
     if (user.role === Role.cashier)
       throw new ForbiddenException('Cashier cannot create attributes.');
 
@@ -247,11 +387,21 @@ export class ProductsService {
       name: dto.name,
       category,
     });
-    return this.attributeRepo.save(attribute);
+    const saved = await this.attributeRepo.save(attribute);
+
+    return {
+      id: saved.id,
+      name: saved.name,
+      categoryId: category.id,
+      categoryName: category.name,
+      createdAt: saved.createdAt,
+    };
   }
 
-  async addAttributeValue(productId: string, dto: CreateProductAttributeValueDto, user: any) {
-    const product = await this.findOne(productId, user);
+  async addAttributeValue(productId: string, dto: CreateProductAttributeValueDto, user: any): Promise<AttributeValueResponse> {
+    const product = await this.productRepo.findOne({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Product not found');
+    
     if (user.role === Role.cashier)
       throw new ForbiddenException('Cashier cannot add attribute values.');
 
@@ -263,74 +413,123 @@ export class ProductsService {
       attribute,
       product,
     });
-    return this.attributeValueRepo.save(value);
+    const saved = await this.attributeValueRepo.save(value);
+
+    return {
+      id: saved.id,
+      value: saved.value,
+      attributeId: attribute.id,
+      attributeName: attribute.name,
+      productId: product.id,
+      createdAt: saved.createdAt,
+    };
   }
 
-  async getAttributes(productId: string, user: any) {
+  async getAttributes(productId: string, user: any): Promise<GetAttributesResponse[]> {
     const product = await this.productRepo.findOne({
       where: { id: productId },
     });
     if (!product) throw new NotFoundException('Product not found');
 
-    return this.attributeValueRepo.find({
+    const attributes = await this.attributeValueRepo.find({
       where: { product: { id: product.id } },
       relations: ['attribute'],
     });
+
+    return attributes.map(attr => ({
+      id: attr.id,
+      value: attr.value,
+      attribute: {
+        id: attr.attribute.id,
+        name: attr.attribute.name,
+      },
+    }));
   }
 
-  async getAttributesByCategory(categoryId: string, user: any) {
+  async getAttributesByCategory(categoryId: string, user: any): Promise<GetAttributesByCategoryResponse[]> {
     const attributes = await this.attributeRepo.find({
       where: { category: { id: categoryId } },
       relations: ['values'],
     });
-    return attributes;
+    
+    return attributes.map(attr => ({
+      id: attr.id,
+      name: attr.name,
+      values: attr.values?.map(v => ({
+        id: v.id,
+        value: v.value,
+      })) || [],
+    }));
   }
 
   // ======================= VARIANT VALUES =======================
 
-  async linkVariantValues(variantId: string, valueIds: string[], user: any) {
+  async linkVariantValues(variantId: string, valueIds: string[], user: any): Promise<LinkVariantValuesResponse> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product', 'values'],
     });
     if (!variant) throw new NotFoundException('Variant not found');
 
-
-
-    const values = await this.attributeValueRepo.findBy({ id: In(valueIds) });
+    const values = await this.attributeValueRepo.find({
+      where: { id: In(valueIds) },
+      relations: ['attribute'],
+    });
+    
     const links = values.map((v) =>
       this.variantValueRepo.create({ variant, attributeValue: v }),
     );
 
     await this.variantValueRepo.save(links);
+    
     return {
-      variant: variant,
-      linkedValues: links.map((link) => link.attributeValue),
-    }
+      variant: {
+        id: variant.id,
+        sku: variant.sku,
+        price: variant.price,
+      },
+      linkedValues: values.map(v => ({
+        id: v.id,
+        value: v.value,
+        attributeId: v.attribute.id,
+      })),
+    };
   }
 
-  async getVariantValues(variantId: string, user: any) {
+  async getVariantValues(variantId: string, user: any): Promise<GetVariantValuesResponse[]> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product'],
     });
     if (!variant) throw new NotFoundException('Variant not found');
 
-
-
-    return this.variantValueRepo.find({
+    const variantValues = await this.variantValueRepo.find({
       where: { variant: { id: variantId } },
       relations: ['attributeValue', 'attributeValue.attribute'],
     });
+
+    return variantValues.map(vv => ({
+      id: vv.id,
+      attributeValue: {
+        id: vv.attributeValue.id,
+        value: vv.attributeValue.value,
+        attribute: {
+          id: vv.attributeValue.attribute.id,
+          name: vv.attributeValue.attribute.name,
+        },
+      },
+    }));
   }
 
-  async uploadProductImages(productId: string, imageUrls: string[], user: any) {
-    const product = await this.findOne(productId, user);
+  async uploadProductImages(productId: string, imageUrls: string[], user: any): Promise<UploadImagesResponse> {
+    const product = await this.productRepo.findOne({ where: { id: productId } });
+    if (!product) throw new NotFoundException('Product not found');
+    
     if (user.role === Role.cashier)
       throw new ForbiddenException('Cashier cannot upload product images.');
+    
     const response: UploadApiResponse[] = await uploadMultipleImagesToCloudinary(imageUrls, 'products');
     const images = response.map((url) =>
-
       this.productImageRepo.create({
         url: url.secure_url,
         public_Id: url.public_id,
@@ -340,6 +539,7 @@ export class ProductsService {
     await this.productImageRepo.save(images);
     product.images = images;
     await this.productRepo.save(product);
+    
     return {
       product: product.name,
       images: images.map((img) => ({ url: img.url })),

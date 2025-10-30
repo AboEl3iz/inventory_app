@@ -10,7 +10,7 @@ async function sendEmail({to, templete , data}) {
             send: true,
             transport: emilConfig,
             views: {
-                root: 'src/shared/mailer/templates/',
+                root: 'src/shared/mail/templates/',
                 options: { extension: 'pug' }
             }
         
