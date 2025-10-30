@@ -1,0 +1,16 @@
+doctype html
+html
+  head
+    meta(charset="UTF-8")
+    title Invoice #{invoiceNumber}
+  body
+    h2 Hi #{userName},
+    p Thanks for your purchase at #{branchName}.
+    p Here are your invoice details:
+    ul
+      li Invoice Number: #{invoiceNumber}
+      li Total Amount: #{totalAmount} EGP
+      li Status: #{status}
+    p You can download your invoice from your account.
+    br
+    small Thank you for choosing My App.

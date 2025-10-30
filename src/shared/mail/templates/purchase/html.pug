@@ -1,0 +1,70 @@
+doctype html
+html
+  head
+    meta(charset="UTF-8")
+    title Purchase Completed
+    style.
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f9f9f9;
+        padding: 20px;
+      }
+      .container {
+        background-color: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      }
+      h2 {
+        color: #333;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+      th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f0f0f0;
+      }
+      .summary {
+        margin-top: 20px;
+        font-weight: bold;
+      }
+      .footer {
+        margin-top: 30px;
+        font-size: 13px;
+        color: #777;
+      }
+  body
+    .container
+      h2 Purchase Order Completed ✅
+      p Hello #{user.name},
+      p Your purchase order ##{purchaseId} for branch <strong>#{branchName}</strong> has been successfully completed.
+
+      h3 Order Details
+      table
+        thead
+          tr
+            th Variant ID
+            th Quantity
+            th Unit Cost
+            th Subtotal
+        tbody
+          each item in items
+            tr
+              td #{item.variantId}
+              td #{item.quantity}
+              td #{item.unitCost.toFixed(2)} EGP
+              td #{(item.quantity * item.unitCost).toFixed(2)} EGP
+
+      .summary
+        p Total Cost: #{totalCost.toFixed(2)} EGP
+
+      .footer
+        p This is an automated message from <strong>My App</strong>.
+        p Please do not reply directly to this email.
