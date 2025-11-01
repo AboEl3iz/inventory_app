@@ -12,6 +12,12 @@ export class Invoice extends BaseEntity {
   @JoinColumn({ name: 'userId' })
   user: User;
 
+  @Column({ nullable: true })
+  CustomerEmail: string;
+
+  @Column({ nullable: true })
+  CustomerName: string;
+
   @ManyToOne(() => Branch, branch => branch.invoices)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;

@@ -1,16 +1,183 @@
 doctype html
-html
+html(lang="ar" dir="rtl")
   head
     meta(charset="UTF-8")
-    title Invoice #{invoiceNumber}
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title فاتورتك رقم #{invoiceId}
+    style.
+      /* 🎨 تنسيق احترافي بسيط ومتوافق مع البريد */
+      body {
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+        direction: rtl;
+        text-align: right;
+      }
+      .container {
+        background-color: #ffffff;
+        max-width: 750px;
+        margin: 0 auto;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        border-bottom: 2px solid #16a34a;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+      }
+      .header h1 {
+        color: #16a34a;
+        margin: 0;
+        font-size: 22px;
+      }
+      .content p {
+        color: #374151;
+        font-size: 15px;
+        line-height: 1.7;
+        margin: 8px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+      th, td {
+        border: 1px solid #e5e7eb;
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+      th {
+        background-color: #f3f4f6;
+        color: #111827;
+        text-align: center;
+        font-weight: 600;
+      }
+      td {
+        text-align: center;
+        color: #374151;
+      }
+      .product-cell {
+        text-align: right !important;
+      }
+      .product-name {
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 4px;
+      }
+      .product-attributes {
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .discount-amount {
+        color: #16a34a;
+        font-weight: 600;
+      }
+      .price {
+        font-weight: 600;
+        color: #111827;
+      }
+      .total {
+        margin-top: 20px;
+        text-align: left;
+        font-weight: bold;
+        color: #111827;
+      }
+      .total-section {
+        background-color: #f9fafb;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 20px;
+      }
+      .total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        font-size: 16px;
+        color: #374151;
+      }
+      .total-row.discount-row {
+        color: #16a34a;
+      }
+      .total-row.final {
+        border-top: 2px solid #16a34a;
+        margin-top: 10px;
+        padding-top: 15px;
+        font-size: 20px;
+        font-weight: 700;
+        color: #16a34a;
+      }
+      .footer {
+        margin-top: 30px;
+        font-size: 13px;
+        color: #6b7280;
+        text-align: center;
+      }
+      .highlight {
+        color: #16a34a;
+        font-weight: bold;
+      }
+
   body
-    h2 Hi #{userName},
-    p Thanks for your purchase at #{branchName}.
-    p Here are your invoice details:
-    ul
-      li Invoice Number: #{invoiceNumber}
-      li Total Amount: #{totalAmount} EGP
-      li Status: #{status}
-    p You can download your invoice from your account.
-    br
-    small Thank you for choosing My App.
+    .container
+      .header
+        h1 🧾 فاتورتك رقم #{invoiceId}
+      .content
+        p مرحبًا #{customer.name},
+        p شكرًا لشرائك من فرع <span class="highlight">#{branchName}</span>.
+        p إليك تفاصيل الفاتورة الخاصة بك:
+        if items && items.length
+          table
+            thead
+              tr
+                th المنتج
+                th الكمية
+                th سعر الوحدة
+                th المجموع
+                th الخصم
+                th الصافي
+            tbody
+              each item in items
+                - var itemSubtotal = (item.quantity * item.unitPrice)
+                - var itemDiscount = item.discount || 0
+                - var itemNetPrice = itemSubtotal - itemDiscount
+                tr
+                  td.product-cell
+                    .product-name
+                      if item.brand
+                        | #{item.brand} 
+                      | #{item.productName}
+                    if item.attributes
+                      .product-attributes #{item.attributes}
+                  td #{item.quantity}
+                  td.price #{item.unitPrice.toFixed(2)} ج.م
+                  td.price #{itemSubtotal.toFixed(2)} ج.م
+                  td.discount-amount
+                    if itemDiscount > 0
+                      | -#{itemDiscount.toFixed(2)} ج.م
+                    else
+                      | -
+                  td.price #{itemNetPrice.toFixed(2)} ج.م
+        
+        .total-section
+          .total-row
+            span المجموع الفرعي:
+            span.price #{subtotal.toFixed(2)} ج.م
+          if invoiceDiscount && invoiceDiscount > 0
+            .total-row.discount-row
+              span الخصم:
+              span.discount-amount -#{invoiceDiscount.toFixed(2)} ج.م
+          if tax && tax > 0
+            .total-row
+              span الضريبة:
+              span.price +#{tax.toFixed(2)} ج.م
+          .total-row.final
+            span الإجمالي الكلي:
+            span.price #{totalAmount.toFixed(2)} ج.م
+        
+        p يمكنك عرض وتحميل فاتورتك من حسابك في أي وقت.
+      
+      .footer
+        p 💚 شكرًا لاختيارك تطبيقنا  
+        p &copy; #{new Date().getFullYear()} My App. جميع الحقوق محفوظة.

@@ -1,0 +1,223 @@
+doctype html
+html(lang="ar" dir="rtl")
+  head
+    meta(charset="UTF-8")
+    meta(name="viewport" content="width=device-width, initial-scale=1.0")
+    title إلغاء الفاتورة رقم #{invoiceId}
+    style.
+      /* 🎨 تنسيق احترافي لإلغاء الفاتورة */
+      body {
+        font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+        direction: rtl;
+        text-align: right;
+      }
+      .container {
+        background-color: #ffffff;
+        max-width: 650px;
+        margin: 0 auto;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        border-top: 4px solid #dc2626;
+      }
+      .header {
+        border-bottom: 2px solid #dc2626;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+      }
+      .header h1 {
+        color: #dc2626;
+        margin: 0;
+        font-size: 24px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .alert-box {
+        background-color: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 20px 0;
+      }
+      .alert-box-icon {
+        font-size: 24px;
+        color: #dc2626;
+        margin-left: 10px;
+      }
+      .alert-box p {
+        margin: 5px 0;
+        color: #991b1b;
+        font-weight: 500;
+      }
+      .content p {
+        color: #374151;
+        font-size: 15px;
+        line-height: 1.7;
+        margin: 10px 0;
+      }
+      .info-section {
+        background-color: #f9fafb;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 20px 0;
+      }
+      .info-section p {
+        margin: 8px 0;
+        color: #4b5563;
+      }
+      .info-section strong {
+        color: #111827;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+      th, td {
+        border: 1px solid #e5e7eb;
+        padding: 10px;
+        font-size: 14px;
+      }
+      th {
+        background-color: #f3f4f6;
+        color: #111827;
+        text-align: center;
+        font-weight: 600;
+      }
+      td {
+        text-align: center;
+        color: #374151;
+      }
+      .product-cell {
+        text-align: right !important;
+      }
+      .product-name {
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 4px;
+      }
+      .product-attributes {
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .status-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        background-color: #fee2e2;
+        color: #991b1b;
+        border-radius: 4px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .next-steps {
+        background-color: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 20px 0;
+      }
+      .next-steps h3 {
+        color: #1e40af;
+        margin: 0 0 10px 0;
+        font-size: 16px;
+      }
+      .next-steps ul {
+        margin: 10px 0;
+        padding-right: 20px;
+        color: #1e3a8a;
+      }
+      .next-steps li {
+        margin: 5px 0;
+        line-height: 1.6;
+      }
+      .footer {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #e5e7eb;
+        font-size: 13px;
+        color: #6b7280;
+        text-align: center;
+      }
+      .highlight {
+        color: #dc2626;
+        font-weight: bold;
+      }
+      .contact-info {
+        background-color: #f9fafb;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 20px;
+        text-align: center;
+      }
+      .contact-info p {
+        margin: 5px 0;
+        color: #4b5563;
+      }
+
+  body
+    .container
+      .header
+        h1 
+          span ❌
+          span إلغاء الفاتورة رقم #{invoiceId}
+      
+      .content
+        .alert-box
+          p
+            span.alert-box-icon ⚠️
+            | تم إلغاء فاتورتك بنجاح
+        
+        p مرحبًا #{customer.name},
+        p نود إعلامك بأن الفاتورة رقم <strong class="highlight">#{invoiceId}</strong> من فرع <strong>#{branchName}</strong> قد تم إلغاؤها.
+        
+        .info-section
+          p
+            strong حالة الفاتورة: 
+            span.status-badge ملغية
+          p
+            strong تاريخ الإلغاء: 
+            | #{new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        
+        if items && items.length
+          p
+            strong تفاصيل المنتجات الملغاة:
+          table
+            thead
+              tr
+                th المنتج
+                th الكمية
+            tbody
+              each item in items
+                tr
+                  td.product-cell
+                    .product-name
+                      if item.brand
+                        | #{item.brand} 
+                      | #{item.productName || 'منتج'}
+                    if item.attributes
+                      .product-attributes #{item.attributes}
+                    else if item.variantId
+                      .product-attributes رمز المنتج: #{item.variantId}
+                  td #{item.quantity}
+        
+        .next-steps
+          h3 ℹ️ ماذا يحدث الآن؟
+          ul
+            li تم إرجاع المخزون إلى النظام تلقائياً
+            li إذا تم الدفع، سيتم رد المبلغ خلال 3-5 أيام عمل
+            li يمكنك إنشاء فاتورة جديدة في أي وقت
+            li للاستفسارات، تواصل معنا مباشرة
+        
+        .contact-info
+          p 
+            strong هل لديك استفسار؟
+          p يمكنك التواصل مع فرع #{branchName}
+          p أو زيارة حسابك في التطبيق
+      
+      .footer
+        p شكراً لتفهمك 🙏
+        p &copy; #{new Date().getFullYear()} My App. جميع الحقوق محفوظة.

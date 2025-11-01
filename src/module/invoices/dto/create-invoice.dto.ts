@@ -3,7 +3,7 @@ import { IsUUID, IsInt, Min, IsNumber, IsString, IsArray, ArrayMinSize, Validate
 import { In } from "typeorm";
 
 export class InvoiceItemDto {
-  @IsUUID()
+
   @IsNotEmpty()
   variantId: string;
 
@@ -22,12 +22,18 @@ export class InvoiceItemDto {
 }
 
 export class CreateInvoiceDto {
-  @IsUUID()
-  @IsNotEmpty()
+
+  @IsOptional()
   branchId: string;
 
-  @IsUUID()
-  @IsNotEmpty()
+
+  @IsOptional()
+  CustomerEmail: string;
+  @IsOptional()
+  CustomerName: string;
+
+
+  @IsOptional()
   userId: string;
 
   @IsArray()

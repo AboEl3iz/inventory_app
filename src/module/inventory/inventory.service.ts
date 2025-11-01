@@ -136,11 +136,17 @@ export class InventoryService {
     };
   }
 
-  async adjustStock(branchId: string, variantId: string, qtyChange: number, user: any): Promise<AdjustStockResponse> {
-    this.checkBranchAccess(user, branchId);
-
-    if (user.role === Role.cashier && qtyChange > 0)
-      throw new ForbiddenException('Cashier cannot manually increase stock');
+ async adjustStock(branchId: string, variantId: string, qtyChange: number, user: any): Promise<AdjustStockResponse> {
+    // ✅ Skip branch access check for system operations (like invoice processing)
+    const isSystemOperation = user?.isSystemOperation === true;
+    
+    if (!isSystemOperation) {
+      this.checkBranchAccess(user, branchId);
+      
+      // Cashiers cannot manually increase stock
+      if (user.role === Role.cashier && qtyChange > 0)
+        throw new ForbiddenException('Cashier cannot manually increase stock');
+    }
 
     const branch = await this.findBranchOrThrow(branchId);
     const variant = await this.variantRepo.findOne({
@@ -162,15 +168,31 @@ export class InventoryService {
 
     const saved = await this.invRepo.save(inv);
 
+    // Determine movement type and notes based on context
+    let movementType: 'sale' | 'purchase' | 'adjustment' | 'return' | 'transfer' | 'damage';
+    let notes: string;
+    
+    if (isSystemOperation) {
+      // System operation (invoice/purchase processing)
+      movementType = qtyChange < 0 ? 'sale' : 'return';
+      notes = qtyChange < 0 
+        ? 'Stock decreased due to invoice creation' 
+        : 'Stock restored due to invoice cancellation';
+    } else {
+      // Manual adjustment
+      movementType = 'adjustment';
+      notes = 'Manual stock adjustment';
+    }
+
     await this.recordMovement({
       branchId,
       variantId,
       userId: user.id,
-      type: 'adjustment',
+      type: movementType,
       quantityBefore: before,
       quantityAfter: saved.quantity,
       quantityChange: qtyChange,
-      notes: 'Manual stock adjustment',
+      notes,
     });
 
     await this.invalidateCaches(branch.id);
@@ -189,6 +211,7 @@ export class InventoryService {
       updatedAt: saved.updatedAt,
     };
   }
+
 
   async transferStock(
     fromBranchId: string,

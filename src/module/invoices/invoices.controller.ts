@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards, NotAcceptableException } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
@@ -17,6 +17,11 @@ export class InvoicesController {
   @Post()
   @Roles(Role.admin, Role.manager, Role.cashier)
   create(@Body() dto: CreateInvoiceDto, @Req() req) {
+    console.log('User from JWT:', req.user);
+    if(req.user.role === Role.admin){
+      throw new NotAcceptableException('Admins are not allowed to create invoices.');
+    }
+
     // user ID and branch come from JWT, not request body
     return this.invoiceService.createInvoice({
       ...dto,

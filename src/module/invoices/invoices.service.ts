@@ -32,125 +32,142 @@ export class InvoicesService {
   /**
    * 🟢 Create a new invoice
    */
-  async createInvoice(dto: CreateInvoiceDto): Promise<CreateInvoiceResponse> {
-    const { branchId, userId, items } = dto;
+async createInvoice(dto: CreateInvoiceDto): Promise<CreateInvoiceResponse> {
+    const { branchId, userId, items, CustomerEmail, CustomerName } = dto;
 
     const branch = await this.branchRepo.findOneBy({ id: branchId });
     if (!branch) throw new BadRequestException('Invalid branch');
 
     return this.dataSource.transaction(async (manager) => {
-      const variants = await manager.find(ProductVariant, {
-        where: { id: In(items.map((i) => i.variantId)) },
-        relations: ['product'],
-      });
+        const variants = await manager.find(ProductVariant, {
+            where: { id: In(items.map((i) => i.variantId)) },
+            relations: ['product'],
+        });
 
-      const variantMap = new Map(variants.map((v) => [v.id, v]));
+        const variantMap = new Map(variants.map((v) => [v.id, v]));
 
-      // Check stock for all variants
-      for (const item of items) {
-        const inventory = await this.inventoryService.findOneByVarientAndBranch(item.variantId, branchId);
-        if (!inventory || inventory.quantity < item.quantity) {
-          throw new BadRequestException(`Insufficient stock for variant ${item.variantId}`);
+        // Check stock for all variants
+        for (const item of items) {
+            const inventory = await this.inventoryService.findOneByVarientAndBranch(item.variantId, branchId);
+            if (!inventory || inventory.quantity < item.quantity) {
+                throw new BadRequestException(`Insufficient stock for variant ${item.variantId}`);
+            }
         }
-      }
 
-      // Calculate totals
-      const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
-      const discount = dto.discount || 0;
-      const tax = dto.tax || 0;
-      const totalAmount = subtotal - discount + tax;
+        // Calculate totals
+        const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+        const discount = dto.discount || 0;
+        const tax = dto.tax || 0;
+        const totalAmount = subtotal - discount + tax;
 
-      // Generate invoice number
-      const count = await manager.count(Invoice);
-      const invoiceNumber = `INV-${String(count + 1).padStart(6, '0')}-${Date.now()}`;
+        // Generate invoice number
+        const count = await manager.count(Invoice);
+        const invoiceNumber = `INV-${String(count + 1).padStart(6, '0')}-${Date.now()}`;
 
-      const invoice = manager.create(Invoice, {
-        invoiceNumber,
-        branch,
-        user: { id: userId } as User,
-        subtotal,
-        discount,
-        tax,
-        totalAmount,
-        status: (dto.status || 'paid') as any,
-        paymentMethod: (dto.paymentMethod || null) as any,
-        paidAt: dto.status === 'paid' ? new Date() : null,
-        notes: dto.notes || '',
-      } as DeepPartial<Invoice>);
+        const invoice = manager.create(Invoice, {
+            CustomerName: CustomerName,
+            CustomerEmail: CustomerEmail,
+            invoiceNumber,
+            branch,
+            user: { id: userId } as User,
+            subtotal,
+            discount,
+            tax,
+            totalAmount,
+            status: (dto.status || 'paid') as any,
+            paymentMethod: (dto.paymentMethod || null) as any,
+            paidAt: dto.status === 'paid' ? new Date() : null,
+            notes: dto.notes || '',
+        } as DeepPartial<Invoice>);
 
+        const savedInvoice = await manager.save(invoice);
 
-      const savedInvoice = await manager.save(invoice);
+        const itemEntities = items.map((it) => {
+            const variant = variantMap.get(it.variantId);
+            if (!variant) throw new BadRequestException(`Variant ${it.variantId} not found`);
 
-      const itemEntities = items.map((it) => {
-        const variant = variantMap.get(it.variantId);
-        if (!variant) throw new BadRequestException(`Variant ${it.variantId} not found`);
-
-        return manager.create(InvoiceItem, {
-          invoice: savedInvoice,
-          variant,
-          quantity: it.quantity,
-          unitPrice: it.unitPrice,
-          discount: it.discount || 0,
-          subtotal: (it.quantity * it.unitPrice) - (it.discount || 0),
+            return manager.create(InvoiceItem, {
+                invoice: savedInvoice,
+                variant,
+                quantity: it.quantity,
+                unitPrice: it.unitPrice,
+                discount: it.discount || 0,
+                subtotal: (it.quantity * it.unitPrice) - (it.discount || 0),
+            });
         });
-      });
 
-      const savedItems = await manager.save(itemEntities);
+        const savedItems = await manager.save(itemEntities);
 
-      // Reduce stock
-      for (const item of savedItems) {
-        await this.inventoryService.adjustStock(branchId, item.variant.id, -item.quantity, {
-          role: Role.admin, // internal system operation
-          branchId,
+        // Get actual user info for the queue
+        const actualUser = await this.userRepo.findOne({
+            where: { id: userId },
+            relations: ['branch'],
         });
-      }
 
-      queueMicrotask(() => {
-        this.invoicesQueue.add(INVOICE_CREATED, {
-          invoiceId: savedInvoice.id,
-          branchId,
-          items: savedItems.map((i) => ({
-            variantId: i.variant.id,
-            qty: i.quantity,
-          })),
+        // Queue job with discount information
+        queueMicrotask(() => {
+            this.invoicesQueue.add(INVOICE_CREATED, {
+                invoiceId: savedInvoice.id,
+                branchId,
+                items: savedItems.map((i) => ({
+                    variantId: i.variant.id,
+                    quantity: i.quantity,
+                    unitPrice: i.unitPrice,
+                    discount: i.discount, // Item-level discount
+                })),
+                // ✅ Add invoice-level discount and tax
+                invoiceDiscount: savedInvoice.discount,
+                invoiceTax: savedInvoice.tax,
+                invoiceSubtotal: savedInvoice.subtotal,
+                invoiceTotalAmount: savedInvoice.totalAmount,
+                user: { 
+                    id: userId, 
+                    branchId: branchId, // ✅ The branch where invoice was created
+                    role: actualUser?.role || 'cashier', // ✅ Keep actual role
+                    branch: { 
+                        id: branch.id, 
+                        name: branch.name 
+                    } 
+                },
+                customer: { email: CustomerEmail, name: CustomerName }
+            });
         });
-      });
 
-      // Get user info for response
-      const user = await this.userRepo.findOneBy({ id: userId });
+        // Get user info for response
+        const user = await this.userRepo.findOneBy({ id: userId });
 
-      return {
-        invoice: {
-          id: savedInvoice.id,
-          invoiceNumber: savedInvoice.invoiceNumber,
-          branchId: branch.id,
-          branchName: branch.name,
-          userId: userId,
-          userName: user?.name || 'Unknown',
-          subtotal: savedInvoice.subtotal,
-          discount: savedInvoice.discount,
-          tax: savedInvoice.tax,
-          totalAmount: savedInvoice.totalAmount,
-          status: savedInvoice.status,
-          paymentMethod: savedInvoice.paymentMethod,
-          paidAt: savedInvoice.paidAt,
-          notes: savedInvoice.notes,
-          createdAt: savedInvoice.createdAt,
-        },
-        items: savedItems.map(item => ({
-          id: item.id,
-          variantId: item.variant.id,
-          variantSku: item.variant.sku,
-          productName: item.variant.product.name,
-          productBrand: item.variant.product.brand,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          discount: item.discount,
-          subtotal: item.subtotal,
-        })),
-      };
+        return {
+            invoice: {
+                id: savedInvoice.id,
+                invoiceNumber: savedInvoice.invoiceNumber,
+                branchId: branch.id,
+                branchName: branch.name,
+                userId: userId,
+                userName: user?.name || 'Unknown',
+                subtotal: savedInvoice.subtotal,
+                discount: savedInvoice.discount,
+                tax: savedInvoice.tax,
+                totalAmount: savedInvoice.totalAmount,
+                status: savedInvoice.status,
+                paymentMethod: savedInvoice.paymentMethod,
+                paidAt: savedInvoice.paidAt,
+                notes: savedInvoice.notes,
+                createdAt: savedInvoice.createdAt,
+            },
+            items: savedItems.map(item => ({
+                id: item.id,
+                variantId: item.variant.id,
+                variantSku: item.variant.sku,
+                productName: item.variant.product.name,
+                productBrand: item.variant.product.brand,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                discount: item.discount,
+                subtotal: item.subtotal,
+            })),
+        };
     });
-  }
+}
 
   /**
    * 🟢 Get all invoices
@@ -286,12 +303,18 @@ export class InvoicesService {
     }
 
     await this.invoicesQueue.add(INVOICE_CANCELED, {
-      invoiceId: id,
+      invoiceId: invoice.invoiceNumber,
       branchId: invoice.branch.id,
       items: invoice.items.map((it) => ({
         variantId: it.variant.id,
-        qty: it.quantity,
+        quantity: it.quantity,
       })),
+      user : {
+        id: user.id,
+        branchId: user.branchId,
+        role: Role.cashier,
+      },
+      customer: { email: invoice.CustomerEmail, name: invoice.CustomerName }
     });
 
     return {

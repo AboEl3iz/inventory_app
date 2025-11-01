@@ -8,6 +8,9 @@ import { WinstonModule } from 'nest-winston';
 import { PuchaseListener } from './listener/purchase.listener';
 import { InvoicesListener } from './listener/invoices.listener';
 import { BullModule } from '@nestjs/bullmq';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Product } from '../products/entities/product.entity';
+import { ProductVariant } from '../products/entities/product-variant.entity';
 
 @Module({
   controllers: [EventsController],
@@ -16,6 +19,9 @@ import { BullModule } from '@nestjs/bullmq';
     WinstonModule,
     EventEmitterModule.forRoot(),
     InventoryModule,
+    TypeOrmModule.forFeature([
+      ProductVariant
+    ]),
     BullModule.registerQueue({ name: "LOW_STOCK_QUEUE" } , { name: "PURCHASES_QUEUE" } , { name: "INVOICES_QUEUE" }),
   ],
 })

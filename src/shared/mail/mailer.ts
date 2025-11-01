@@ -6,7 +6,7 @@ config();
 async function sendEmail({ to, templete, data }) {
     try {
         const email = new Email({
-            message: { from: `My App <${process.env.EMAIL_FROM}>` },
+            message: { from: `My App <${process.env.EMAIL_FROM_ADDRESS}>` },
             send: true,
             transport: emilConfig,
             views: {
