@@ -1,0 +1,27 @@
+extends ../_layout
+
+block content
+  h2(style='color: #1976d2;') Quarterly Tax Summary
+  h3 Q#{quarter} #{year}
+  
+  table
+    tbody
+      tr
+        td
+          strong Total Sales
+        td(style='text-align: right;') $#{totalSales.toFixed(2)}
+      tr
+        td
+          strong Taxable Amount
+        td(style='text-align: right;') $#{taxableAmount.toFixed(2)}
+      tr
+        td
+          strong Tax Rate
+        td(style='text-align: right;') #{taxRate.toFixed(2)}%
+      tr(style='background: #fff3e0;')
+        td
+          strong Total Tax Collected
+        td(style='text-align: right; font-weight: bold; color: #f57c00;')
+          | $#{totalTaxCollected.toFixed(2)}
+  
+  p(style='color: #666;') Please review this summary with your accountant before filing.

@@ -64,7 +64,7 @@ export class PuchaseListener extends WorkerHost {
 
                 await sendEmail({
                     to: payload.user.email,
-                    templete: 'purchase',
+                    template: 'purchase',
                     data: {
                         purchaseId: payload.purchaseId,
                         branchName: payload.user.branch?.name || 'Unknown Branch',
@@ -122,7 +122,7 @@ export class PuchaseListener extends WorkerHost {
             try {
                 await sendEmail({
                     to: payload.user.email,
-                    templete: 'purchase-cancelled',
+                    template: 'purchase-cancelled',
                     data: {
                         purchaseId: payload.purchaseId,
                         branchName: payload.user.branch?.name || 'Unknown Branch',

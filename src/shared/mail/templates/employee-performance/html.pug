@@ -1,0 +1,21 @@
+extends ../_layout
+
+block content
+  h2(style='color: #1976d2;') Weekly Employee Performance Summary
+  
+  table
+    thead
+      tr
+        th Employee
+        th Branch
+        th Total Sales
+        th Orders
+        th Avg Order Value
+    tbody
+      each data in performanceData
+        tr
+          td= data.user.name
+          td= data.user.branch.name
+          td(style='text-align: right;') $#{data.totalSales.toFixed(2)}
+          td(style='text-align: center;')= data.totalOrders
+          td(style='text-align: right;') $#{data.averageOrderValue.toFixed(2)}

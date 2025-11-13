@@ -49,9 +49,14 @@ import { BullModule } from '@nestjs/bullmq';
       },
       defaultJobOptions: {
         attempts: 3,
+        // removeOnComplete: true
       }
     }),
-    BullModule.registerQueue({ name: "PURCHASES_QUEUE" }, { name: "INVOICES_QUEUE" }, { name: "LOW_STOCK_QUEUE" }),
+  BullModule.registerQueue({ name: 'PURCHASES_QUEUE' }),
+BullModule.registerQueue({ name: 'INVOICES_QUEUE' }),
+BullModule.registerQueue({ name: 'LOW_STOCK_QUEUE' }),
+BullModule.registerQueue({ name: 'EMAIL_QUEUE' }),
+
 
 
     ProductsModule,

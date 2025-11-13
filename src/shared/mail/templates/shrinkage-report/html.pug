@@ -1,0 +1,29 @@
+extends ../_layout
+
+block content
+  h2(style='color: #d32f2f;') Monthly Shrinkage Report
+  h3= month
+  
+  .alert.alert-danger
+    p
+      strong Total Shrinkage: 
+      | #{totalUnits} units
+    p
+      strong Estimated Value: 
+      | $#{estimatedValue.toFixed(2)}
+    p
+      strong Shrinkage Rate: 
+      | #{shrinkageRate.toFixed(2)}%
+  
+  h3 Shrinkage by Branch
+  ul
+    each branch in byBranch
+      li #{branch.branchName}: #{branch.units} units ($#{branch.value.toFixed(2)})
+  
+  h3 Most Affected Products
+  ol
+    each product in topProducts
+      li #{product.productName} - #{product.units} units
+  
+  p(style='color: #666; margin-top: 30px;')
+    | Please review security and handling procedures to minimize shrinkage.

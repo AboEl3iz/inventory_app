@@ -131,7 +131,7 @@ export class InvoicesListener extends WorkerHost  {
 
                 await sendEmail({
                     to: payload.customer.email,
-                    templete: 'invoices',
+                    template: 'invoices',
                     data: {
                         invoiceId: payload.invoiceId,
                         branchName: payload.user?.branch?.name || 'Unknown Branch',
@@ -231,7 +231,7 @@ export class InvoicesListener extends WorkerHost  {
 
                 await sendEmail({
                     to: payload.customer.email,
-                    templete: 'invoices-cancelled',
+                    template: 'invoices-cancelled',
                     data: {
                         invoiceId: payload.invoiceId,
                         branchName: payload.user?.branch?.name || 'Unknown Branch',

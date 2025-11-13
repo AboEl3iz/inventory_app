@@ -1,0 +1,22 @@
+extends ../_layout
+
+block content
+  .alert.alert-warning
+    h2(style='color: #ff9800; margin-top: 0;') Sales Target Alert
+    p The branch #[strong #{branchName}] is below the daily sales target:
+  
+  .metric-card
+    p
+      strong Target: 
+      | $#{target.toFixed(2)}
+    p
+      strong Actual Sales: 
+      | $#{actualSales.toFixed(2)}
+    p
+      strong Achievement: 
+      | #{percentage.toFixed(1)}%
+    
+    div(style='background: #fff; height: 30px; border-radius: 15px; overflow: hidden; margin-top: 10px;')
+      div(style=`background: ${percentage >= 80 ? '#388e3c' : percentage >= 60 ? '#ff9800' : '#d32f2f'}; width: ${percentage}%; height: 100%;`)
+  
+  p(style='color: #666;') Consider promotional activities to boost sales today.

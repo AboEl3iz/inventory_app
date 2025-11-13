@@ -1,0 +1,30 @@
+extends ../_layout
+
+block content
+  .alert.alert-info
+    h2(style='color: #1976d2; margin-top: 0;') Purchase Order Suggestion
+    p Based on current stock levels, we recommend placing an order with #[strong #{supplierName}]:
+  
+  table
+    thead
+      tr
+        th Product
+        th SKU
+        th Current Stock
+        th Suggested Quantity
+        th Branch
+    tbody
+      each item in items
+        tr
+          td= item.variant.product.name
+          td= item.variant.sku
+          td(style='text-align: center;')= item.currentStock
+          td(style='text-align: center; font-weight: bold; color: #388e3c;')= item.suggestedQuantity
+          td= item.branch.name
+  
+  .metric-card
+    p.metric-label Estimated Total Cost
+    p.metric-value(style='color: #388e3c;') $#{totalEstimatedCost.toFixed(2)}
+  
+  p(style='color: #666;') This is an automated suggestion. Please review before placing the order.
+

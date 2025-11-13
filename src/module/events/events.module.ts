@@ -11,10 +11,11 @@ import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Product } from '../products/entities/product.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
+import { EmailProcessor } from './listener/sendEmail.listener';
 
 @Module({
   controllers: [EventsController],
-  providers: [EventsService , StockListener , PuchaseListener , InvoicesListener],
+  providers: [EventsService, StockListener, PuchaseListener, InvoicesListener , EmailProcessor],
   imports: [
     WinstonModule,
     EventEmitterModule.forRoot(),
@@ -22,7 +23,11 @@ import { ProductVariant } from '../products/entities/product-variant.entity';
     TypeOrmModule.forFeature([
       ProductVariant
     ]),
-    BullModule.registerQueue({ name: "LOW_STOCK_QUEUE" } , { name: "PURCHASES_QUEUE" } , { name: "INVOICES_QUEUE" }),
+    BullModule.registerQueue({ name: 'PURCHASES_QUEUE' }),
+    BullModule.registerQueue({ name: 'INVOICES_QUEUE' }),
+    BullModule.registerQueue({ name: 'LOW_STOCK_QUEUE' }),
+    BullModule.registerQueue({ name: 'EMAIL_QUEUE' }),
+
   ],
 })
-export class EventsModule {}
+export class EventsModule { }

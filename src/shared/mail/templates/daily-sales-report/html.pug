@@ -1,0 +1,19 @@
+extends ../_layout
+
+block content
+  h2(style='color: #1976d2;') Daily Sales Report
+  h3= branchName
+  p(style='color: #666;')= date
+  
+  .metric-card
+    p.metric-label Total Revenue
+    p.metric-value(style='color: #388e3c;') $#{totalRevenue.toFixed(2)}
+  
+  .metric-card
+    p.metric-label Total Orders
+    p.metric-value(style='color: #1976d2;')= totalOrders
+  
+  .metric-card
+    p.metric-label Average Order Value
+    p.metric-value(style='color: #f57c00;') $#{averageOrderValue.toFixed(2)}
+

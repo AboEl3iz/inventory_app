@@ -1,9 +1,9 @@
 import { IsOptional, IsEnum, IsDateString, IsUUID } from "class-validator";
 
-export class DashboardQueryDto {
+export class TrendQueryDto {
   @IsOptional()
-  @IsEnum(['today', 'week', 'month', 'year', 'custom'])
-  period?: 'today' | 'week' | 'month' | 'year' | 'custom';
+  @IsEnum(['hour', 'day', 'week', 'month'])
+  groupBy?: 'hour' | 'day' | 'week' | 'month';
 
   @IsOptional()
   @IsDateString()

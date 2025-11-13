@@ -3,7 +3,7 @@ import emilConfig from "src/config/email.config";
 import 'dotenv/config';
 import { config } from "dotenv";
 config();
-async function sendEmail({ to, templete, data }) {
+async function sendEmail({ to, template, data }) {
     try {
         const email = new Email({
             message: { from: `My App <${process.env.EMAIL_FROM_ADDRESS}>` },
@@ -16,7 +16,7 @@ async function sendEmail({ to, templete, data }) {
 
         });
         await email.send({
-            template: templete,
+            template: template,
             message: { to: to },
             locals: data,
         });

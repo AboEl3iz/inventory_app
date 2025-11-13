@@ -1,0 +1,23 @@
+extends ../_layout
+
+block content
+  .alert.alert-warning
+    h2(style='color: #ff9800; margin-top: 0;') Slow-Moving Inventory Alert
+    p The following #{totalItems} items have not sold in the last 3 months:
+  
+  table
+    thead
+      tr
+        th Product
+        th SKU
+        th Stock
+        th Branch
+    tbody
+      each item in items
+        tr
+          td= item.product.name
+          td= item.sku
+          td(style='text-align: center;')= item.inventory.quantity
+          td= item.inventory.branch.name
+  
+  p(style='color: #666;') Consider promotions or markdowns to move these items.

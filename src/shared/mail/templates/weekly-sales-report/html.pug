@@ -1,0 +1,27 @@
+extends ../_layout
+
+block content
+  h2(style='color: #1976d2;') Weekly Sales Report
+  p(style='color: #666;') Week: #{weekStart} to #{weekEnd}
+  
+  .metric-card(style='background: #e8f5e9;')
+    p.metric-label Total Revenue
+    p.metric-value(style='color: #388e3c;') $#{totalRevenue.toFixed(2)}
+    p(style=`font-size: 12px; color: ${revenueGrowth >= 0 ? '#388e3c' : '#d32f2f'};`)
+      | #{revenueGrowth >= 0 ? '↑' : '↓'} #{Math.abs(revenueGrowth).toFixed(1)}% vs last week
+  
+  .metric-card(style='background: #e3f2fd;')
+    p.metric-label Total Orders
+    p.metric-value(style='color: #1976d2;')= totalOrders
+    p(style=`font-size: 12px; color: ${ordersGrowth >= 0 ? '#388e3c' : '#d32f2f'};`)
+      | #{ordersGrowth >= 0 ? '↑' : '↓'} #{Math.abs(ordersGrowth).toFixed(1)}% vs last week
+  
+  .metric-card(style='background: #fff3e0;')
+    p.metric-label Average Order Value
+    p.metric-value(style='color: #f57c00;') $#{averageOrderValue.toFixed(2)}
+  
+  h3 Top Performing Products
+  ol
+    each product in topProducts
+      li #{product.name} - #{product.quantity} units sold
+
