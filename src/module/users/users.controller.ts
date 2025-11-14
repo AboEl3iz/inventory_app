@@ -6,8 +6,9 @@ import { AuthenticationGuard } from 'src/common/guard/authentication.guard';
 import { Roles ,Role } from 'src/common/decorator/roles.decorator';
 import { LoginUserDto } from './dto/login-user.dto';
 import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
-
+import { ApiBody, ApiResponse } from '@nestjs/swagger';
 @Controller('users')
+@UseGuards()
 export class UsersController {
   private readonly logger = new Logger('UsersController');
   constructor(private readonly usersService: UsersService) {
