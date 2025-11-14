@@ -6,9 +6,11 @@ import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
 import { Role, Roles } from 'src/common/decorator/roles.decorator';
 import { TrendQueryDto } from './dto/trend-query.dto';
 import { InventoryQueryDto } from './dto/inventory-query.dto';
-import { ApiResponse , ApiOperation , ApiQuery } from '@nestjs/swagger';
+import { ApiResponse , ApiOperation , ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('analytics')
+@ApiTags('Analytics')
+@ApiBearerAuth('access-token')
 @UseGuards()
 @UseGuards(AuthenticationGuard,AuthorizationGuard)
 export class AnalyticsController {

@@ -5,8 +5,11 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { Roles, Role } from 'src/common/decorator/roles.decorator';
 import { AuthenticationGuard } from 'src/common/guard/authentication.guard';
 import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('invoices')
+@ApiTags('Invoices')
+@ApiBearerAuth('access-token')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class InvoicesController {
   constructor(private readonly invoiceService: InvoicesService) {}
@@ -15,6 +18,8 @@ export class InvoicesController {
    * 🟢 Create a new invoice
    */
   @Post()
+  @ApiOperation({ summary: 'Create invoice', description: 'Create a new invoice. Admin, manager, and cashier can perform this action.' })
+  @ApiResponse({ status: 201, description: 'Invoice created successfully' })
   @Roles(Role.admin, Role.manager, Role.cashier)
   create(@Body() dto: CreateInvoiceDto, @Req() req) {
     console.log('User from JWT:', req.user);
@@ -34,6 +39,12 @@ export class InvoicesController {
    * 🟢 Get all invoices (filtered by role)
    */
   @Get()
+  @ApiOperation({ summary: 'Get all invoices', description: 'Retrieve all invoices based on user role' })
+  @ApiQuery({ name: 'branchId', type: 'string', required: false, description: 'Filter by branch UUID' })
+  @ApiQuery({ name: 'status', type: 'string', required: false, description: 'Filter by invoice status' })
+  @ApiQuery({ name: 'limit', type: 'number', required: false, description: 'Number of items per page (default: 20)' })
+  @ApiQuery({ name: 'page', type: 'number', required: false, description: 'Page number (default: 1)' })
+  @ApiResponse({ status: 200, description: 'Invoices retrieved successfully' })
   @Roles(Role.admin, Role.manager, Role.cashier)
   async getAll(
     @Req() req,
@@ -49,6 +60,9 @@ export class InvoicesController {
    * 🟢 Get one invoice
    */
   @Get(':id')
+  @ApiOperation({ summary: 'Get invoice by ID', description: 'Retrieve a specific invoice' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Invoice UUID' })
+  @ApiResponse({ status: 200, description: 'Invoice retrieved successfully' })
   @Roles(Role.admin, Role.manager, Role.cashier)
   async getOne(@Param('id') id: string, @Req() req) {
     return this.invoiceService.getOne(id, req.user);
@@ -58,6 +72,9 @@ export class InvoicesController {
    * 🔴 Cancel invoice
    */
   @Delete(':id')
+  @ApiOperation({ summary: 'Cancel invoice', description: 'Cancel an invoice. Only admin and manager can perform this action.' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Invoice UUID' })
+  @ApiResponse({ status: 200, description: 'Invoice cancelled successfully' })
   @Roles(Role.admin, Role.manager)
   async cancelInvoice(@Param('id') id: string, @Req() req) {
     return this.invoiceService.cancelInvoice(id, req.user);
