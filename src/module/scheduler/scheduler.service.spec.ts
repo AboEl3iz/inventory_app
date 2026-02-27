@@ -16,11 +16,20 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { InvoiceItem } from '../invoices/entities/invoice_items.entity';
 
 const mockRepo = () => ({
-  find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
   createQueryBuilder: jest.fn(),
 });
 
-const mockLogger = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), log: jest.fn() };
+const mockLogger = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+  log: jest.fn(),
+};
 
 describe('SchedulerService', () => {
   let service: SchedulerService;
@@ -37,11 +46,32 @@ describe('SchedulerService', () => {
         { provide: getRepositoryToken(Branch), useFactory: mockRepo },
         { provide: getRepositoryToken(User), useFactory: mockRepo },
         { provide: getRepositoryToken(InvoiceItem), useFactory: mockRepo },
-        { provide: NotificationService, useValue: { sendLowStockAlert: jest.fn(), handleLowStockAlert: jest.fn() } },
-        { provide: ReportService, useValue: { generateWeeklyReport: jest.fn(), generateProfitLossReport: jest.fn(), generateTaxSummary: jest.fn(), generateShrinkageReport: jest.fn() } },
+        {
+          provide: NotificationService,
+          useValue: {
+            sendLowStockAlert: jest.fn(),
+            handleLowStockAlert: jest.fn(),
+          },
+        },
+        {
+          provide: ReportService,
+          useValue: {
+            generateWeeklyReport: jest.fn(),
+            generateProfitLossReport: jest.fn(),
+            generateTaxSummary: jest.fn(),
+            generateShrinkageReport: jest.fn(),
+          },
+        },
         { provide: WINSTON_MODULE_PROVIDER, useValue: mockLogger },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
-        { provide: SchedulerRegistry, useValue: { getCronJobs: jest.fn().mockReturnValue(new Map()), addCronJob: jest.fn(), deleteCronJob: jest.fn() } },
+        {
+          provide: SchedulerRegistry,
+          useValue: {
+            getCronJobs: jest.fn().mockReturnValue(new Map()),
+            addCronJob: jest.fn(),
+            deleteCronJob: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

@@ -13,7 +13,6 @@ import { Logger } from 'winston';
 // ==================== REPORT SERVICE ====================
 @Injectable()
 export class ReportService {
-
   constructor(
     @Inject(WINSTON_MODULE_PROVIDER)
     private readonly logger: Logger,
@@ -28,16 +27,21 @@ export class ReportService {
   ) {}
 
   // ==================== WEEKLY REPORTS ====================
-  
+
   async generateWeeklyReport(startDate: Date, endDate: Date) {
-    this.logger.info(`Generating weekly report from ${startDate} to ${endDate}`);
+    this.logger.info(
+      `Generating weekly report from ${startDate} to ${endDate}`,
+    );
 
     // Get current period aggregation
     const result = await this.invoiceRepo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalRevenue')
       .addSelect('COUNT(invoice.id)', 'totalOrders')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .getRawOne();
 
@@ -48,24 +52,29 @@ export class ReportService {
     // Get previous period data
     const prevWeekStart = moment(startDate).subtract(1, 'week').toDate();
     const prevWeekEnd = moment(endDate).subtract(1, 'week').toDate();
-    
+
     const prevResult = await this.invoiceRepo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'prevTotalRevenue')
       .addSelect('COUNT(invoice.id)', 'prevTotalOrders')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate: prevWeekStart, endDate: prevWeekEnd })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate: prevWeekStart,
+        endDate: prevWeekEnd,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .getRawOne();
 
     const prevTotalRevenue = Number(prevResult?.prevTotalRevenue || 0);
     const prevTotalOrders = Number(prevResult?.prevTotalOrders || 0);
 
-    const revenueGrowth = prevTotalRevenue > 0 
-      ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 
-      : 0;
-    const ordersGrowth = prevTotalOrders > 0 
-      ? ((totalOrders - prevTotalOrders) / prevTotalOrders) * 100 
-      : 0;
+    const revenueGrowth =
+      prevTotalRevenue > 0
+        ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100
+        : 0;
+    const ordersGrowth =
+      prevTotalOrders > 0
+        ? ((totalOrders - prevTotalOrders) / prevTotalOrders) * 100
+        : 0;
 
     // Get top products using QueryBuilder
     const topProductsRaw = await this.invoiceItemRepo
@@ -76,7 +85,10 @@ export class ReportService {
       .select('product.name', 'name')
       .addSelect('SUM(item.quantity)', 'quantity')
       .addSelect('SUM(item.subtotal)', 'revenue')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .groupBy('product.id')
       .addGroupBy('product.name')
@@ -84,7 +96,7 @@ export class ReportService {
       .limit(10)
       .getRawMany();
 
-    const topProducts = topProductsRaw.map(p => ({
+    const topProducts = topProductsRaw.map((p) => ({
       name: p.name,
       quantity: Number(p.quantity),
       revenue: Number(p.revenue),
@@ -104,17 +116,20 @@ export class ReportService {
   }
 
   // ==================== PROFIT & LOSS ====================
-  
+
   async generateProfitLossReport(startDate: Date, endDate: Date) {
     this.logger.info(`Generating P&L report from ${startDate} to ${endDate}`);
 
     const revenueResult = await this.invoiceRepo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalRevenue')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .getRawOne();
-      
+
     const totalRevenue = Number(revenueResult?.totalRevenue || 0);
 
     const cogsResult = await this.invoiceItemRepo
@@ -122,18 +137,25 @@ export class ReportService {
       .leftJoin('item.invoice', 'invoice')
       .leftJoin('item.variant', 'variant')
       .select('SUM(item.quantity * variant.costPrice)', 'cogs')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .getRawOne();
 
     const cogs = Number(cogsResult?.cogs || 0);
     const grossProfit = totalRevenue - cogs;
-    const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    const grossMargin =
+      totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
     const expensesResult = await this.purchaseRepo
       .createQueryBuilder('purchase')
       .select('SUM(purchase.totalAmount)', 'operatingExpenses')
-      .where('purchase.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .where('purchase.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('purchase.status = :status', { status: 'completed' })
       .getRawOne();
 
@@ -141,7 +163,8 @@ export class ReportService {
 
     // Calculate net profit
     const netProfit = grossProfit - operatingExpenses;
-    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+    const profitMargin =
+      totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
 
     return {
       month: moment(startDate).format('MMMM YYYY'),
@@ -158,7 +181,7 @@ export class ReportService {
   }
 
   // ==================== TAX SUMMARY ====================
-  
+
   async generateTaxSummary(startDate: Date, endDate: Date) {
     this.logger.info(`Generating tax summary from ${startDate} to ${endDate}`);
 
@@ -167,14 +190,18 @@ export class ReportService {
       .select('SUM(invoice.totalAmount)', 'totalSales')
       .addSelect('SUM(invoice.tax)', 'totalTaxCollected')
       .addSelect('SUM(invoice.subtotal)', 'taxableAmount')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .getRawOne();
-      
+
     const totalSales = Number(summaryResult?.totalSales || 0);
     const totalTaxCollected = Number(summaryResult?.totalTaxCollected || 0);
     const taxableAmount = Number(summaryResult?.taxableAmount || 0);
-    const taxRate = taxableAmount > 0 ? (totalTaxCollected / taxableAmount) * 100 : 0;
+    const taxRate =
+      taxableAmount > 0 ? (totalTaxCollected / taxableAmount) * 100 : 0;
 
     const monthlyRaw = await this.invoiceRepo
       .createQueryBuilder('invoice')
@@ -182,13 +209,16 @@ export class ReportService {
       .addSelect('SUM(invoice.totalAmount)', 'revenue')
       .addSelect('SUM(invoice.tax)', 'tax')
       .addSelect('COUNT(invoice.id)', 'invoiceCount')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .groupBy("TO_CHAR(invoice.createdAt, 'Mon YYYY')")
       .orderBy('MAX(invoice.createdAt)', 'ASC')
       .getRawMany();
 
-    const monthlyBreakdown = monthlyRaw.map(m => ({
+    const monthlyBreakdown = monthlyRaw.map((m) => ({
       month: m.month,
       revenue: Number(m.revenue),
       tax: Number(m.tax),
@@ -212,7 +242,7 @@ export class ReportService {
   }
 
   // ==================== FORECASTING ====================
-  
+
   async generateForecastingData() {
     this.logger.info('Generating sales forecasting data');
 
@@ -224,17 +254,21 @@ export class ReportService {
       .select("TO_CHAR(invoice.createdAt, 'Mon YYYY')", 'month')
       .addSelect('SUM(invoice.totalAmount)', 'revenue')
       .addSelect('COUNT(invoice.id)', 'orders')
-      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate: twelveMonthsAgo, endDate: now })
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate: twelveMonthsAgo,
+        endDate: now,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .groupBy("TO_CHAR(invoice.createdAt, 'Mon YYYY')")
       .orderBy('MAX(invoice.createdAt)', 'ASC')
       .getRawMany();
 
-    const monthlyData = monthlyRaw.map(m => ({
+    const monthlyData = monthlyRaw.map((m) => ({
       month: m.month,
       revenue: Number(m.revenue),
       orders: Number(m.orders),
-      averageOrderValue: Number(m.orders) > 0 ? Number(m.revenue) / Number(m.orders) : 0,
+      averageOrderValue:
+        Number(m.orders) > 0 ? Number(m.revenue) / Number(m.orders) : 0,
     }));
 
     // Simple linear regression for next month prediction
@@ -248,21 +282,26 @@ export class ReportService {
   }
 
   // ==================== SHRINKAGE REPORT ====================
-  
+
   async generateShrinkageReport(shrinkageData: StockMovement[]) {
     this.logger.info('Generating shrinkage report');
 
     // Calculate total shrinkage
-    const totalUnits = shrinkageData.reduce((sum, item) => sum + Math.abs(item.quantityChange), 0);
-    
+    const totalUnits = shrinkageData.reduce(
+      (sum, item) => sum + Math.abs(item.quantityChange),
+      0,
+    );
+
     // Calculate estimated value
     const estimatedValue = shrinkageData.reduce((sum, item) => {
-      return sum + (Math.abs(item.quantityChange) * Number(item.variant.costPrice));
+      return (
+        sum + Math.abs(item.quantityChange) * Number(item.variant.costPrice)
+      );
     }, 0);
 
     // Group by branch
     const byBranch = new Map();
-    shrinkageData.forEach(item => {
+    shrinkageData.forEach((item) => {
       const branchId = item.branch.id;
       const existing = byBranch.get(branchId) || {
         branchName: item.branch.name,
@@ -270,13 +309,14 @@ export class ReportService {
         value: 0,
       };
       existing.units += Math.abs(item.quantityChange);
-      existing.value += Math.abs(item.quantityChange) * Number(item.variant.costPrice);
+      existing.value +=
+        Math.abs(item.quantityChange) * Number(item.variant.costPrice);
       byBranch.set(branchId, existing);
     });
 
     // Group by product
     const byProduct = new Map();
-    shrinkageData.forEach(item => {
+    shrinkageData.forEach((item) => {
       const productId = item.variant.product.id;
       const existing = byProduct.get(productId) || {
         productName: item.variant.product.name,
@@ -284,7 +324,8 @@ export class ReportService {
         value: 0,
       };
       existing.units += Math.abs(item.quantityChange);
-      existing.value += Math.abs(item.quantityChange) * Number(item.variant.costPrice);
+      existing.value +=
+        Math.abs(item.quantityChange) * Number(item.variant.costPrice);
       byProduct.set(productId, existing);
     });
 
@@ -307,17 +348,20 @@ export class ReportService {
   }
 
   // ==================== HELPER METHODS ====================
-  
+
   private predictNextMonth(monthlyData: any[]) {
     // Simple moving average prediction
     const lastThreeMonths = monthlyData.slice(-3);
-    const avgRevenue = lastThreeMonths.reduce((sum, m) => sum + m.revenue, 0) / 3;
+    const avgRevenue =
+      lastThreeMonths.reduce((sum, m) => sum + m.revenue, 0) / 3;
     const avgOrders = lastThreeMonths.reduce((sum, m) => sum + m.orders, 0) / 3;
 
     // Calculate trend
-    const trend = monthlyData.length >= 2 
-      ? monthlyData[monthlyData.length - 1].revenue - monthlyData[monthlyData.length - 2].revenue
-      : 0;
+    const trend =
+      monthlyData.length >= 2
+        ? monthlyData[monthlyData.length - 1].revenue -
+          monthlyData[monthlyData.length - 2].revenue
+        : 0;
 
     return {
       month: moment().add(1, 'month').format('MMM YYYY'),
@@ -337,7 +381,7 @@ export class ReportService {
 
 //   async createFullBackup() {
 //     this.logger.log('Creating full database backup');
-    
+
 //     // Implementation depends on your database
 //     // For PostgreSQL:
 //     // const { exec } = require('child_process');
@@ -356,25 +400,24 @@ export class ReportService {
 
 //   async archiveInvoices(invoices: Invoice[]) {
 //     this.logger.log(`Archiving ${invoices.length} invoices`);
-    
+
 //     // Export to JSON or CSV
 //     const archiveData = JSON.stringify(invoices, null, 2);
 //     const fileName = `archive-invoices-${moment().format('YYYY-MM-DD')}.json`;
-    
+
 //     // Save to file system or cloud storage
 //     // fs.writeFileSync(`./archives/${fileName}`, archiveData);
-    
+
 //     this.logger.log(`Invoices archived to ${fileName}`);
 //   }
 
 //   async restoreFromBackup(backupFile: string) {
 //     this.logger.log(`Restoring from backup: ${backupFile}`);
-    
+
 //     // Implementation depends on your database
 //     // For PostgreSQL:
 //     // exec(`psql ${dbName} < ${backupFile}`, ...);
-    
+
 //     this.logger.log('Restore completed');
 //   }
 // }
-

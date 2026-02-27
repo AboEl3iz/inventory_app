@@ -10,9 +10,9 @@ import { InvoiceItem } from '../invoices/entities/invoice_items.entity';
 @Module({
   controllers: [ReportsController],
   providers: [ReportService],
-  exports:[ReportService],
-  imports:[
-    TypeOrmModule.forFeature([Purchase,Invoice,InvoiceItem,StockMovement])
-  ]
+  exports: [ReportService],
+  imports: [
+    TypeOrmModule.forFeature([Purchase, Invoice, InvoiceItem, StockMovement]),
+  ],
 })
 export class ReportsModule {}

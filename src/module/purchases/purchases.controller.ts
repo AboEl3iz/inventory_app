@@ -1,4 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, BadRequestException, UseGuards, Req, ParseUUIDPipe, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  BadRequestException,
+  UseGuards,
+  Req,
+  ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
@@ -6,7 +20,14 @@ import { CacheKey, CacheTTL } from '@nestjs/cache-manager';
 import { AuthenticationGuard } from 'src/common/guard/authentication.guard';
 import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
 import { Role, Roles } from 'src/common/decorator/roles.decorator';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 @Controller('purchases')
 @ApiTags('Purchases')
@@ -20,7 +41,11 @@ export class PurchasesController {
    * Only admins and managers can create purchases
    */
   @Post()
-  @ApiOperation({ summary: 'Create purchase', description: 'Create a new purchase order with items. Only admin and manager can perform this action.' })
+  @ApiOperation({
+    summary: 'Create purchase',
+    description:
+      'Create a new purchase order with items. Only admin and manager can perform this action.',
+  })
   @ApiResponse({ status: 201, description: 'Purchase created successfully' })
   @Roles(Role.admin, Role.manager)
   @HttpCode(HttpStatus.CREATED)
@@ -46,7 +71,10 @@ export class PurchasesController {
    * Non-admin users only see purchases from their branch
    */
   @Get()
-  @ApiOperation({ summary: 'Get all purchases', description: 'Retrieve all purchase orders based on user role' })
+  @ApiOperation({
+    summary: 'Get all purchases',
+    description: 'Retrieve all purchase orders based on user role',
+  })
   @ApiResponse({ status: 200, description: 'Purchases retrieved successfully' })
   @CacheKey('all_purchases')
   @CacheTTL(60)
@@ -58,7 +86,10 @@ export class PurchasesController {
    * Get purchase by ID
    */
   @Get(':id')
-  @ApiOperation({ summary: 'Get purchase by ID', description: 'Retrieve a specific purchase order' })
+  @ApiOperation({
+    summary: 'Get purchase by ID',
+    description: 'Retrieve a specific purchase order',
+  })
   @ApiParam({ name: 'id', type: 'string', description: 'Purchase UUID' })
   @ApiResponse({ status: 200, description: 'Purchase retrieved successfully' })
   @CacheTTL(60)
@@ -71,7 +102,11 @@ export class PurchasesController {
    * This action triggers stock movement
    */
   @Patch(':id/complete')
-  @ApiOperation({ summary: 'Complete purchase', description: 'Complete a purchase and update inventory. Only admin and manager can perform this action.' })
+  @ApiOperation({
+    summary: 'Complete purchase',
+    description:
+      'Complete a purchase and update inventory. Only admin and manager can perform this action.',
+  })
   @ApiParam({ name: 'id', type: 'string', description: 'Purchase UUID' })
   @ApiResponse({ status: 200, description: 'Purchase completed successfully' })
   @Roles(Role.admin, Role.manager)
@@ -85,7 +120,11 @@ export class PurchasesController {
    * Cannot cancel completed purchases
    */
   @Patch(':id/cancel')
-  @ApiOperation({ summary: 'Cancel purchase', description: 'Cancel a pending purchase. Only admin and manager can perform this action.' })
+  @ApiOperation({
+    summary: 'Cancel purchase',
+    description:
+      'Cancel a pending purchase. Only admin and manager can perform this action.',
+  })
   @ApiParam({ name: 'id', type: 'string', description: 'Purchase UUID' })
   @ApiResponse({ status: 200, description: 'Purchase cancelled successfully' })
   @Roles(Role.admin, Role.manager)
@@ -99,7 +138,10 @@ export class PurchasesController {
    * Cannot delete completed purchases
    */
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete purchase', description: 'Delete a purchase. Only admin can perform this action.' })
+  @ApiOperation({
+    summary: 'Delete purchase',
+    description: 'Delete a purchase. Only admin can perform this action.',
+  })
   @ApiParam({ name: 'id', type: 'string', description: 'Purchase UUID' })
   @ApiResponse({ status: 200, description: 'Purchase deleted successfully' })
   @Roles(Role.admin)

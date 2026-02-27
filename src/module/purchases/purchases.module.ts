@@ -14,9 +14,13 @@ import { BullModule } from '@nestjs/bullmq';
   providers: [PurchasesService],
   imports: [
     TypeOrmModule.forFeature([
-      Purchase, ProductVariant, Branch, User, Supplier
+      Purchase,
+      ProductVariant,
+      Branch,
+      User,
+      Supplier,
     ]),
-    BullModule.registerQueue({ name: "PURCHASES_QUEUE" }),
+    BullModule.registerQueue({ name: 'PURCHASES_QUEUE' }),
   ],
 })
 export class PurchasesModule {}

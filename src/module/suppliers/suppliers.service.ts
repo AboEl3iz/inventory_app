@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,10 +27,12 @@ export class SuppliersService {
     private readonly productRepo: Repository<Product>,
     @InjectRepository(Branch)
     private readonly branchRepo: Repository<Branch>,
-  ) { }
+  ) {}
 
   async create(createSupplierDto: CreateSupplierDto): Promise<Supplier> {
-    const existing = await this.supplierRepository.findOneBy({ name: createSupplierDto.name });
+    const existing = await this.supplierRepository.findOneBy({
+      name: createSupplierDto.name,
+    });
     if (existing) {
       throw new BadRequestException('Supplier already exists');
     }
@@ -56,7 +62,10 @@ export class SuppliersService {
     return supplier;
   }
 
-  async update(id: string, updateSupplierDto: UpdateSupplierDto): Promise<Supplier> {
+  async update(
+    id: string,
+    updateSupplierDto: UpdateSupplierDto,
+  ): Promise<Supplier> {
     const supplier = await this.supplierRepository.preload({
       id,
       ...updateSupplierDto,
@@ -80,7 +89,9 @@ export class SuppliersService {
    * Generate refill recommendations based on low-stock items and best supplier pricing.
    * Optimized: batch-loads purchases instead of N+1 queries per item.
    */
-  async getRefillRecommendations(): Promise<ISuppliersRecommendations[] | { message: string }> {
+  async getRefillRecommendations(): Promise<
+    ISuppliersRecommendations[] | { message: string }
+  > {
     // Step 1: Get all low-stock inventory items
     const lowStockItems = await this.inventoryRepo
       .createQueryBuilder('inventory')
@@ -95,7 +106,9 @@ export class SuppliersService {
     }
 
     // Step 2: Batch-load recent purchases for all relevant variants and branches
-    const variantIds = [...new Set(lowStockItems.map((item) => item.variant.id))];
+    const variantIds = [
+      ...new Set(lowStockItems.map((item) => item.variant.id)),
+    ];
     const branchIds = [...new Set(lowStockItems.map((item) => item.branch.id))];
 
     const recentPurchases = await this.purchaseRepo
@@ -132,16 +145,29 @@ export class SuppliersService {
       if (!purchases.length) continue;
 
       // Calculate best supplier by lowest average cost
-      const supplierStats = new Map<string, { totalCost: number; count: number; supplier: Supplier }>();
+      const supplierStats = new Map<
+        string,
+        { totalCost: number; count: number; supplier: Supplier }
+      >();
 
-      for (const p of purchases.slice(0, 5)) { // Limit to last 5 per combo
+      for (const p of purchases.slice(0, 5)) {
+        // Limit to last 5 per combo
         if (!p.supplier) continue;
-        const variantItems = p.items.filter((it) => it.variant.id === variant.id);
-        const variantTotal = variantItems.reduce((sum, it) => sum + it.unitCost * it.quantity, 0);
+        const variantItems = p.items.filter(
+          (it) => it.variant.id === variant.id,
+        );
+        const variantTotal = variantItems.reduce(
+          (sum, it) => sum + it.unitCost * it.quantity,
+          0,
+        );
 
         const sKey = p.supplier.name;
         if (!supplierStats.has(sKey)) {
-          supplierStats.set(sKey, { totalCost: 0, count: 0, supplier: p.supplier });
+          supplierStats.set(sKey, {
+            totalCost: 0,
+            count: 0,
+            supplier: p.supplier,
+          });
         }
         const data = supplierStats.get(sKey)!;
         data.totalCost += variantTotal;
@@ -160,7 +186,9 @@ export class SuppliersService {
         currentQuantity: quantity,
         threshold: minThreshold,
         recommendedSupplier: bestSupplier.supplier.name,
-        avgPurchaseCost: +(bestSupplier.totalCost / bestSupplier.count).toFixed(2),
+        avgPurchaseCost: +(bestSupplier.totalCost / bestSupplier.count).toFixed(
+          2,
+        ),
       });
     }
 

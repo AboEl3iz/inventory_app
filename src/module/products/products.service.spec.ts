@@ -33,12 +33,21 @@ describe('ProductsService', () => {
         { provide: getRepositoryToken(Product), useFactory: mockRepo },
         { provide: getRepositoryToken(ProductVariant), useFactory: mockRepo },
         { provide: getRepositoryToken(ProductAttribute), useFactory: mockRepo },
-        { provide: getRepositoryToken(ProductAttributeValue), useFactory: mockRepo },
-        { provide: getRepositoryToken(ProductVariantValue), useFactory: mockRepo },
+        {
+          provide: getRepositoryToken(ProductAttributeValue),
+          useFactory: mockRepo,
+        },
+        {
+          provide: getRepositoryToken(ProductVariantValue),
+          useFactory: mockRepo,
+        },
         { provide: getRepositoryToken(Category), useFactory: mockRepo },
         { provide: getRepositoryToken(Supplier), useFactory: mockRepo },
         { provide: getRepositoryToken(ProductImage), useFactory: mockRepo },
-        { provide: STORAGE_PROVIDER, useValue: { uploadFile: jest.fn(), deleteFile: jest.fn() } },
+        {
+          provide: STORAGE_PROVIDER,
+          useValue: { uploadFile: jest.fn(), deleteFile: jest.fn() },
+        },
       ],
     }).compile();
 

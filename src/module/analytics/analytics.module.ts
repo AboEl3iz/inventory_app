@@ -16,7 +16,7 @@ import { User } from '../users/entities/user.entity';
 @Module({
   controllers: [AnalyticsController],
   providers: [AnalyticsService],
-  imports:[
+  imports: [
     TypeOrmModule.forFeature([
       Invoice,
       InvoiceItem,
@@ -27,8 +27,8 @@ import { User } from '../users/entities/user.entity';
       Product,
       Category,
       Branch,
-      User
-    ])
-  ]
+      User,
+    ]),
+  ],
 })
 export class AnalyticsModule {}

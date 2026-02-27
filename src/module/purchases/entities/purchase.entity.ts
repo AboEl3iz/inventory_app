@@ -1,5 +1,6 @@
 import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Supplier } from '../../suppliers/entities/supplier.entity';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { User } from '../../users/entities/user.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 import { ProductVariant } from 'src/module/products/entities/product-variant.entity';
@@ -10,15 +11,15 @@ export class Purchase extends BaseEntity {
   @Column({ unique: true })
   purchaseNumber: string;
 
-  @ManyToOne(() => Supplier, supplier => supplier.purchases)
+  @ManyToOne(() => Supplier, (supplier) => supplier.purchases)
   @JoinColumn({ name: 'supplierId' })
   supplier: Supplier;
 
-  @ManyToOne(() => User, user => user.purchases)
+  @ManyToOne(() => User, (user) => user.purchases)
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @ManyToOne(() => Branch, branch => branch.purchases)
+  @ManyToOne(() => Branch, (branch) => branch.purchases)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
@@ -43,8 +44,6 @@ export class Purchase extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
-  @OneToMany(() => PurchaseItem, item => item.purchase, { cascade: true })
+  @OneToMany(() => PurchaseItem, (item) => item.purchase, { cascade: true })
   items: PurchaseItem[];
 }
-
-

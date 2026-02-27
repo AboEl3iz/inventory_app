@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -6,7 +11,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Category } from './entities/category.entity';
 import * as cashTypes from 'src/shared/interfaces/cash-types';
-import { CategoryActionResponse, CategoryDetailResponse, CategoryFlatResponse, CategoryResponse, CategoryStatsResponse, CategoryTreeItemResponse } from 'src/shared/interfaces/category-reponse';
+import {
+  CategoryActionResponse,
+  CategoryDetailResponse,
+  CategoryFlatResponse,
+  CategoryResponse,
+  CategoryStatsResponse,
+  CategoryTreeItemResponse,
+} from 'src/shared/interfaces/category-reponse';
 
 @Injectable()
 export class CategoriesService {
@@ -14,17 +26,17 @@ export class CategoriesService {
     @InjectRepository(Category)
     private categoryRepo: Repository<Category>,
     @Inject(CACHE_MANAGER) private cacheManager: cashTypes.IAppCache,
-  ) {
-
-  }
+  ) {}
   async create(dto: CreateCategoryDto): Promise<CategoryResponse> {
-    const category = this.categoryRepo.create({ 
+    const category = this.categoryRepo.create({
       name: dto.name,
-      description: dto.description 
+      description: dto.description,
     });
 
     if (dto.parentId) {
-      const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+      const parent = await this.categoryRepo.findOne({
+        where: { id: dto.parentId },
+      });
       if (!parent) throw new NotFoundException('Parent category not found');
       category.parent = parent;
     }
@@ -49,9 +61,11 @@ export class CategoriesService {
     const cached = await this.cacheManager.get(cacheKey);
     if (cached) return cached as CategoryResponse[];
 
-    const categories = await this.categoryRepo.find({ relations: ['children', 'parent'] });
-    
-    const response = categories.map(cat => ({
+    const categories = await this.categoryRepo.find({
+      relations: ['children', 'parent'],
+    });
+
+    const response = categories.map((cat) => ({
       id: cat.id,
       name: cat.name,
       description: cat.description,
@@ -68,7 +82,7 @@ export class CategoriesService {
   async findFlat(): Promise<CategoryFlatResponse[]> {
     const cacheKey = 'categories_flat';
     const cached = await this.cacheManager.get(cacheKey);
-    if (cached) return cached as CategoryFlatResponse[]; 
+    if (cached) return cached as CategoryFlatResponse[];
 
     const categories = await this.categoryRepo.find({ select: ['id', 'name'] });
     await this.cacheManager.set(cacheKey, categories, 60 * 5);
@@ -85,19 +99,22 @@ export class CategoriesService {
     return {
       id: category.id,
       name: category.name,
-      parent: category.parent ? { id: category.parent.id, name: category.parent.name } : null,
+      parent: category.parent
+        ? { id: category.parent.id, name: category.parent.name }
+        : null,
       productsCount: category.products?.length || 0,
-      children: category.children?.map((child) => ({
-        id: child.id,
-        name: child.name,
-      })) || [],
+      children:
+        category.children?.map((child) => ({
+          id: child.id,
+          name: child.name,
+        })) || [],
     };
   }
 
   async update(id: string, dto: UpdateCategoryDto): Promise<CategoryResponse> {
-    const category = await this.categoryRepo.findOne({ 
+    const category = await this.categoryRepo.findOne({
       where: { id },
-      relations: ['parent']
+      relations: ['parent'],
     });
     if (!category) throw new NotFoundException('Category not found');
 
@@ -108,7 +125,9 @@ export class CategoriesService {
       if (dto.parentId === id) {
         throw new BadRequestException('Category cannot be its own parent');
       }
-      const parent = await this.categoryRepo.findOne({ where: { id: dto.parentId } });
+      const parent = await this.categoryRepo.findOne({
+        where: { id: dto.parentId },
+      });
       if (!parent) throw new NotFoundException('Parent category not found');
       category.parent = parent;
     }
@@ -163,7 +182,7 @@ export class CategoriesService {
       .orderBy('productcount', 'DESC')
       .getRawMany();
 
-    const response = stats.map(stat => ({
+    const response = stats.map((stat) => ({
       id: stat.id,
       name: stat.name,
       productcount: parseInt(stat.productcount),
@@ -179,7 +198,7 @@ export class CategoriesService {
       .where('LOWER(category.name) LIKE LOWER(:name)', { name: `%${name}%` })
       .getMany();
 
-    return categories.map(cat => ({
+    return categories.map((cat) => ({
       id: cat.id,
       name: cat.name,
     }));
@@ -207,5 +226,4 @@ export class CategoriesService {
       children: category.children?.map((child) => this.buildTree(child)) || [],
     };
   }
-
 }

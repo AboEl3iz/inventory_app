@@ -15,7 +15,7 @@ import { StockMovement } from '../stock/entities/stock.entity';
       Inventory,
       ProductVariant,
       Branch,
-      StockMovement
+      StockMovement,
     ]),
   ],
   exports: [InventoryService],

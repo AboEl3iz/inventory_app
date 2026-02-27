@@ -59,7 +59,10 @@ describe('CategoriesService', () => {
       mockCategoryRepo.save.mockResolvedValue(mockCategory);
       mockCacheManager.del.mockResolvedValue(undefined);
 
-      const result = await service.create({ name: 'Electronics', description: 'Electronic devices' });
+      const result = await service.create({
+        name: 'Electronics',
+        description: 'Electronic devices',
+      });
 
       expect(result).toEqual({
         id: mockCategory.id,
@@ -77,14 +80,22 @@ describe('CategoriesService', () => {
 
     it('should create a category with parent', async () => {
       const parentCat = { ...mockCategory, id: 'parent-1', name: 'Parent' };
-      const childCat = { ...mockCategory, id: 'child-1', name: 'Child', parent: parentCat };
+      const childCat = {
+        ...mockCategory,
+        id: 'child-1',
+        name: 'Child',
+        parent: parentCat,
+      };
 
       mockCategoryRepo.create.mockReturnValue(childCat);
       mockCategoryRepo.findOne.mockResolvedValue(parentCat);
       mockCategoryRepo.save.mockResolvedValue(childCat);
       mockCacheManager.del.mockResolvedValue(undefined);
 
-      const result = await service.create({ name: 'Child', parentId: 'parent-1' });
+      const result = await service.create({
+        name: 'Child',
+        parentId: 'parent-1',
+      });
 
       expect(result.parentId).toBe('parent-1');
       expect(result.parentName).toBe('Parent');
@@ -138,7 +149,9 @@ describe('CategoriesService', () => {
     it('should throw NotFoundException if not found', async () => {
       mockCategoryRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -149,7 +162,9 @@ describe('CategoriesService', () => {
       mockCategoryRepo.findOne.mockResolvedValue({ ...mockCategory });
       mockCategoryRepo.save.mockResolvedValue(updated);
 
-      const result = await service.update('cat-1', { name: 'Updated Electronics' });
+      const result = await service.update('cat-1', {
+        name: 'Updated Electronics',
+      });
 
       expect(result.name).toBe('Updated Electronics');
       expect(mockCacheManager.del).toHaveBeenCalledWith('categories_tree');
@@ -187,7 +202,9 @@ describe('CategoriesService', () => {
     it('should throw NotFoundException if category not found for delete', async () => {
       mockCategoryRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -214,7 +231,9 @@ describe('CategoriesService', () => {
 
     it('should fetch from DB if not cached', async () => {
       mockCacheManager.get.mockResolvedValue(null);
-      mockCategoryRepo.find.mockResolvedValue([{ id: 'cat-1', name: 'Electronics' }]);
+      mockCategoryRepo.find.mockResolvedValue([
+        { id: 'cat-1', name: 'Electronics' },
+      ]);
 
       const result = await service.findFlat();
       expect(result).toHaveLength(1);
@@ -256,7 +275,11 @@ describe('CategoriesService', () => {
         groupBy: jest.fn().mockReturnThis(),
         addGroupBy: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
-        getRawMany: jest.fn().mockResolvedValue([{ id: 'cat-1', name: 'Electronics', productcount: '5' }]),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 'cat-1', name: 'Electronics', productcount: '5' },
+          ]),
       };
       mockCategoryRepo.createQueryBuilder.mockReturnValue(qb);
 

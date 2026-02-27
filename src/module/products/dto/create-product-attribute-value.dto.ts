@@ -6,6 +6,4 @@ export class CreateProductAttributeValueDto {
 
   @IsUUID()
   attributeId: string;
-
- 
 }

@@ -14,8 +14,12 @@ describe('BranchesController', () => {
         {
           provide: BranchesService,
           useValue: {
-            create: jest.fn(), findAll: jest.fn(), findOne: jest.fn(),
-            update: jest.fn(), remove: jest.fn(), getBranchStats: jest.fn(),
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+            getBranchStats: jest.fn(),
             assignUserToBranch: jest.fn(),
           },
         },

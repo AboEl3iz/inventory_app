@@ -9,8 +9,13 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 
 const mockRepo = () => ({
-  find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(),
-  update: jest.fn(), remove: jest.fn(), createQueryBuilder: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+  update: jest.fn(),
+  remove: jest.fn(),
+  createQueryBuilder: jest.fn(),
 });
 
 describe('PurchasesService', () => {

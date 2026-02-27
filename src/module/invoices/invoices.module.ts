@@ -16,9 +16,13 @@ import { User } from '../users/entities/user.entity';
   imports: [
     InventoryModule,
     TypeOrmModule.forFeature([
-      InvoiceItem , ProductVariant,Invoice,Branch,User
+      InvoiceItem,
+      ProductVariant,
+      Invoice,
+      Branch,
+      User,
     ]),
-    BullModule.registerQueue({ name: "INVOICES_QUEUE" }),
+    BullModule.registerQueue({ name: 'INVOICES_QUEUE' }),
   ],
 })
 export class InvoicesModule {}

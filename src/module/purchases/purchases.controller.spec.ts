@@ -14,9 +14,12 @@ describe('PurchasesController', () => {
         {
           provide: PurchasesService,
           useValue: {
-            createPurchase: jest.fn(), completePurchase: jest.fn(),
-            findAll: jest.fn(), findOne: jest.fn(),
-            cancelPurchase: jest.fn(), remove: jest.fn(),
+            createPurchase: jest.fn(),
+            completePurchase: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            cancelPurchase: jest.fn(),
+            remove: jest.fn(),
           },
         },
       ],

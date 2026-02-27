@@ -1,14 +1,19 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { EventEmitter2, OnEvent } from "@nestjs/event-emitter";
-import { InventoryService } from "src/module/inventory/inventory.service";
-import { PURCHASE_COMPLETED, INVOICE_CREATED, LOW_STOCK, INVOICE_CANCELED } from "src/shared/event.constants";
-import { Logger } from "winston";
+import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { InventoryService } from 'src/module/inventory/inventory.service';
+import {
+  PURCHASE_COMPLETED,
+  INVOICE_CREATED,
+  LOW_STOCK,
+  INVOICE_CANCELED,
+} from 'src/shared/event.constants';
+import { Logger } from 'winston';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Logger as WinstonLogger } from 'winston';
-import { Processor, WorkerHost } from "@nestjs/bullmq";
-import { Job } from "bullmq";
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Job } from 'bullmq';
 @Processor('LOW_STOCK_QUEUE')
-export class StockListener extends WorkerHost  {
+export class StockListener extends WorkerHost {
   async process(job: Job, token?: string): Promise<any> {
     return this.handleLowStock(job.data);
   }
@@ -20,10 +25,6 @@ export class StockListener extends WorkerHost  {
   ) {
     super();
   }
-
- 
-
-  
 
   /**
    * Handle low stock → notify via logs / notifications

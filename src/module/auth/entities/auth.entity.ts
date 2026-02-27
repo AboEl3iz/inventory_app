@@ -1,5 +1,6 @@
 import { Entity, Column, OneToOne, JoinColumn } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { User } from '../../users/entities/user.entity';
+import { BaseEntity } from '../../../entities/base.entity';
+import { User } from '../../users/entities/user.entity';
 import { join } from 'path';
 
 @Entity('auth')

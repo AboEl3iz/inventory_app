@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -12,7 +18,13 @@ import { InvoiceItem } from './entities/invoice_items.entity';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { InventoryService } from '../inventory/inventory.service';
 import { InjectQueue } from '@nestjs/bullmq';
-import { BranchStatsResponse, CancelInvoiceResponse, CreateInvoiceResponse, GetAllInvoicesResponse, InvoiceDetailResponse } from 'src/shared/interfaces/invoices-response';
+import {
+  BranchStatsResponse,
+  CancelInvoiceResponse,
+  CreateInvoiceResponse,
+  GetAllInvoicesResponse,
+  InvoiceDetailResponse,
+} from 'src/shared/interfaces/invoices-response';
 import { User } from '../users/entities/user.entity';
 import { IUserPayload } from 'src/shared/interfaces/user-payload.interface';
 
@@ -24,11 +36,12 @@ export class InvoicesService {
     @InjectRepository(InvoiceItem) private itemRepo: Repository<InvoiceItem>,
     @InjectRepository(Branch) private branchRepo: Repository<Branch>,
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(ProductVariant) private variantRepo: Repository<ProductVariant>,
+    @InjectRepository(ProductVariant)
+    private variantRepo: Repository<ProductVariant>,
     private readonly eventEmitter: EventEmitter2,
     private readonly inventoryService: InventoryService,
     @InjectQueue('INVOICES_QUEUE') private invoicesQueue,
-  ) { }
+  ) {}
 
   /**
    * 🟢 Create a new invoice
@@ -49,14 +62,22 @@ export class InvoicesService {
 
       // Check stock for all variants
       for (const item of items) {
-        const inventory = await this.inventoryService.findOneByVariantAndBranch(item.variantId, branchId);
+        const inventory = await this.inventoryService.findOneByVariantAndBranch(
+          item.variantId,
+          branchId,
+        );
         if (!inventory || inventory.quantity < item.quantity) {
-          throw new BadRequestException(`Insufficient stock for variant ${item.variantId}`);
+          throw new BadRequestException(
+            `Insufficient stock for variant ${item.variantId}`,
+          );
         }
       }
 
       // Calculate totals
-      const subtotal = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+      const subtotal = items.reduce(
+        (sum, i) => sum + i.quantity * i.unitPrice,
+        0,
+      );
       const discount = dto.discount || 0;
       const tax = dto.tax || 0;
       const totalAmount = subtotal - discount + tax;
@@ -85,7 +106,8 @@ export class InvoicesService {
 
       const itemEntities = items.map((it) => {
         const variant = variantMap.get(it.variantId);
-        if (!variant) throw new BadRequestException(`Variant ${it.variantId} not found`);
+        if (!variant)
+          throw new BadRequestException(`Variant ${it.variantId} not found`);
 
         return manager.create(InvoiceItem, {
           invoice: savedInvoice,
@@ -93,7 +115,7 @@ export class InvoicesService {
           quantity: it.quantity,
           unitPrice: it.unitPrice,
           discount: it.discount || 0,
-          subtotal: (it.quantity * it.unitPrice) - (it.discount || 0),
+          subtotal: it.quantity * it.unitPrice - (it.discount || 0),
         });
       });
 
@@ -127,10 +149,10 @@ export class InvoicesService {
             role: actualUser?.role || 'cashier', // ✅ Keep actual role
             branch: {
               id: branch.id,
-              name: branch.name
-            }
+              name: branch.name,
+            },
           },
-          customer: { email: CustomerEmail, name: CustomerName }
+          customer: { email: CustomerEmail, name: CustomerName },
         });
       });
 
@@ -155,7 +177,7 @@ export class InvoicesService {
           notes: savedInvoice.notes,
           createdAt: savedInvoice.createdAt,
         },
-        items: savedItems.map(item => ({
+        items: savedItems.map((item) => ({
           id: item.id,
           variantId: item.variant.id,
           variantSku: item.variant.sku,
@@ -178,7 +200,7 @@ export class InvoicesService {
     branchId?: string,
     status?: string,
     limit = 20,
-    page = 1
+    page = 1,
   ): Promise<GetAllInvoicesResponse> {
     const qb = this.invRepo
       .createQueryBuilder('invoice')
@@ -201,7 +223,7 @@ export class InvoicesService {
     const [invoices, count] = await qb.getManyAndCount();
 
     return {
-      data: invoices.map(invoice => ({
+      data: invoices.map((invoice) => ({
         id: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         branchName: invoice.branch.name,
@@ -228,7 +250,13 @@ export class InvoicesService {
   async getOne(id: string, user: IUserPayload): Promise<InvoiceDetailResponse> {
     const invoice = await this.invRepo.findOne({
       where: { id },
-      relations: ['items', 'items.variant', 'items.variant.product', 'user', 'branch'],
+      relations: [
+        'items',
+        'items.variant',
+        'items.variant.product',
+        'user',
+        'branch',
+      ],
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
 
@@ -251,7 +279,7 @@ export class InvoicesService {
         address: invoice.branch.address,
         phone: invoice.branch.phone,
       },
-      items: invoice.items.map(item => ({
+      items: invoice.items.map((item) => ({
         id: item.id,
         variant: {
           id: item.variant.id,
@@ -281,13 +309,17 @@ export class InvoicesService {
   /**
    * 🔴 Cancel invoice (restore stock)
    */
-  async cancelInvoice(id: string, user: IUserPayload): Promise<CancelInvoiceResponse> {
+  async cancelInvoice(
+    id: string,
+    user: IUserPayload,
+  ): Promise<CancelInvoiceResponse> {
     const invoice = await this.invRepo.findOne({
       where: { id },
       relations: ['items', 'items.variant', 'branch'],
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    if (invoice.status === 'cancelled') throw new BadRequestException('Already canceled');
+    if (invoice.status === 'cancelled')
+      throw new BadRequestException('Already canceled');
 
     if (user.role !== Role.admin && invoice.branch.id !== user.branchId) {
       throw new ForbiddenException('Access denied.');
@@ -297,7 +329,12 @@ export class InvoicesService {
     const saved = await this.invRepo.save(invoice);
 
     for (const item of invoice.items) {
-      await this.inventoryService.adjustStock(invoice.branch.id, item.variant.id, item.quantity, user);
+      await this.inventoryService.adjustStock(
+        invoice.branch.id,
+        item.variant.id,
+        item.quantity,
+        user,
+      );
     }
 
     await this.invoicesQueue.add(INVOICE_CANCELED, {
@@ -312,7 +349,7 @@ export class InvoicesService {
         branchId: user.branchId,
         role: Role.cashier,
       },
-      customer: { email: invoice.CustomerEmail, name: invoice.CustomerName }
+      customer: { email: invoice.CustomerEmail, name: invoice.CustomerName },
     });
 
     return {
@@ -331,7 +368,10 @@ export class InvoicesService {
   /**
    * 📊 Revenue stats by branch
    */
-  async getBranchStats(branchId: string, user: IUserPayload): Promise<BranchStatsResponse[]> {
+  async getBranchStats(
+    branchId: string,
+    user: IUserPayload,
+  ): Promise<BranchStatsResponse[]> {
     if (user.role !== Role.admin && user.branchId !== branchId) {
       throw new ForbiddenException('Access denied.');
     }
@@ -346,7 +386,7 @@ export class InvoicesService {
       .orderBy('DATE(invoice.createdAt)', 'DESC')
       .getRawMany();
 
-    return stats.map(stat => ({
+    return stats.map((stat) => ({
       date: stat.date,
       totalSales: parseFloat(stat.totalSales),
     }));

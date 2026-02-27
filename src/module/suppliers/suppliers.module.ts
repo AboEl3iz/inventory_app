@@ -12,7 +12,7 @@ import { Purchase } from '../purchases/entities/purchase.entity';
   controllers: [SuppliersController],
   providers: [SuppliersService],
   imports: [
-    TypeOrmModule.forFeature([Supplier,Inventory,Purchase,Branch,Product]), 
+    TypeOrmModule.forFeature([Supplier, Inventory, Purchase, Branch, Product]),
   ],
 })
 export class SuppliersModule {}

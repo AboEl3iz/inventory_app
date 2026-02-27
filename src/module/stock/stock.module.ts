@@ -10,4 +10,4 @@ import { StockMovement } from './entities/stock.entity';
   providers: [StockService],
   exports: [StockService],
 })
-export class StockModule { }
+export class StockModule {}

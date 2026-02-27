@@ -11,4 +11,3 @@ export class Analytics extends BaseEntity {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   recordedAt: Date;
 }
-

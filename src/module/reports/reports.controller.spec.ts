@@ -12,8 +12,10 @@ describe('ReportsController', () => {
         {
           provide: ReportService,
           useValue: {
-            generateWeeklyReport: jest.fn(), generateProfitLossReport: jest.fn(),
-            generateTaxSummary: jest.fn(), generateForecastingData: jest.fn(),
+            generateWeeklyReport: jest.fn(),
+            generateProfitLossReport: jest.fn(),
+            generateTaxSummary: jest.fn(),
+            generateForecastingData: jest.fn(),
             generateShrinkageReport: jest.fn(),
           },
         },

@@ -11,18 +11,26 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { EmailProcessor } from './listener/sendEmail.listener';
 import { Event } from './entities/event.entity';
-import { PURCHASES_QUEUE, INVOICES_QUEUE, LOW_STOCK_QUEUE, EMAIL_QUEUE } from '../../shared/event.constants';
+import {
+  PURCHASES_QUEUE,
+  INVOICES_QUEUE,
+  LOW_STOCK_QUEUE,
+  EMAIL_QUEUE,
+} from '../../shared/event.constants';
 
 @Module({
   controllers: [EventsController],
-  providers: [EventsService, StockListener, PuchaseListener, InvoicesListener, EmailProcessor],
+  providers: [
+    EventsService,
+    StockListener,
+    PuchaseListener,
+    InvoicesListener,
+    EmailProcessor,
+  ],
   imports: [
     WinstonModule,
     InventoryModule,
-    TypeOrmModule.forFeature([
-      Event,
-      ProductVariant,
-    ]),
+    TypeOrmModule.forFeature([Event, ProductVariant]),
     BullModule.registerQueue({ name: PURCHASES_QUEUE }),
     BullModule.registerQueue({ name: INVOICES_QUEUE }),
     BullModule.registerQueue({ name: LOW_STOCK_QUEUE }),
@@ -30,4 +38,4 @@ import { PURCHASES_QUEUE, INVOICES_QUEUE, LOW_STOCK_QUEUE, EMAIL_QUEUE } from '.
   ],
   exports: [EventsService],
 })
-export class EventsModule { }
+export class EventsModule {}

@@ -1,18 +1,20 @@
-import { InjectQueue } from "@nestjs/bullmq";
-import { Inject, Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { OnEvent } from "@nestjs/event-emitter";
-import { Queue } from "bullmq";
-import { WINSTON_MODULE_NEST_PROVIDER, WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
+import { Queue } from 'bullmq';
+import {
+  WINSTON_MODULE_NEST_PROVIDER,
+  WINSTON_MODULE_PROVIDER,
+} from 'nest-winston';
 import { Logger } from 'winston';
 // ==================== EMAIL QUEUE PRODUCER ====================
 @Injectable()
 export class NotificationService {
-
   constructor(
     @Inject(WINSTON_MODULE_PROVIDER)
-              private readonly logger: Logger,
-    @InjectQueue("EMAIL_QUEUE") private emailQueue: Queue,
+    private readonly logger: Logger,
+    @InjectQueue('EMAIL_QUEUE') private emailQueue: Queue,
     private configService: ConfigService,
   ) {}
 
@@ -49,13 +51,15 @@ export class NotificationService {
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
   @OnEvent('inventory.reorder-suggestion')
   async handlePurchaseOrderSuggestion(purchaseOrder: any) {
-    this.logger.info(`Queuing purchase order suggestion for ${purchaseOrder.supplier.name}`);
+    this.logger.info(
+      `Queuing purchase order suggestion for ${purchaseOrder.supplier.name}`,
+    );
 
     await this.emailQueue.add(
       'send-email',
@@ -74,7 +78,7 @@ export class NotificationService {
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
@@ -82,9 +86,11 @@ export class NotificationService {
 
   @OnEvent('report.daily-sales')
   async handleDailySalesReport(payload: { report: any; recipients: any[] }) {
-    this.logger.info(`Queuing daily sales report for ${payload.report.branch.name}`);
+    this.logger.info(
+      `Queuing daily sales report for ${payload.report.branch.name}`,
+    );
 
-    const emails = payload.recipients.map(r => r.email);
+    const emails = payload.recipients.map((r) => r.email);
 
     await this.emailQueue.add(
       'send-email',
@@ -105,7 +111,7 @@ export class NotificationService {
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
@@ -113,7 +119,7 @@ export class NotificationService {
   async handleWeeklyReport(payload: { report: any; recipients: any[] }) {
     this.logger.info('Queuing weekly sales report');
 
-    const emails = payload.recipients.map(r => r.email);
+    const emails = payload.recipients.map((r) => r.email);
 
     await this.emailQueue.add(
       'send-email',
@@ -137,48 +143,42 @@ export class NotificationService {
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
   @OnEvent('report.monthly-pl')
   async handleMonthlyPLReport(payload: { report: any; recipients: any[] }) {
     this.logger.info('Queuing monthly P&L report');
-this.logger.info(
-        `
-        admins accounts ${
-          payload.recipients.map(e=>{
-            return e.email
-          })
-        }
-        `
-      )
-    const emails = payload.recipients.map(r => r.email);
-
-    await this.emailQueue.add(
-      'send-email',
-      {
-        to: emails,
-        template: 'monthly-pl-report',
-        data: {
-          month: payload.report.month,
-          totalRevenue: payload.report.totalRevenue,
-          cogs: payload.report.cogs,
-          grossProfit: payload.report.grossProfit,
-          operatingExpenses: payload.report.operatingExpenses,
-          netProfit: payload.report.netProfit,
-          profitMargin: payload.report.profitMargin,
-        },
-      },
-      
+    this.logger.info(
+      `
+        admins accounts ${payload.recipients.map((e) => {
+          return e.email;
+        })}
+        `,
     );
+    const emails = payload.recipients.map((r) => r.email);
+
+    await this.emailQueue.add('send-email', {
+      to: emails,
+      template: 'monthly-pl-report',
+      data: {
+        month: payload.report.month,
+        totalRevenue: payload.report.totalRevenue,
+        cogs: payload.report.cogs,
+        grossProfit: payload.report.grossProfit,
+        operatingExpenses: payload.report.operatingExpenses,
+        netProfit: payload.report.netProfit,
+        profitMargin: payload.report.profitMargin,
+      },
+    });
   }
 
   @OnEvent('report.tax-summary')
   async handleTaxSummary(payload: { summary: any; recipients: any[] }) {
     this.logger.info('Queuing quarterly tax summary');
 
-    const emails = payload.recipients.map(r => r.email);
+    const emails = payload.recipients.map((r) => r.email);
 
     await this.emailQueue.add(
       'send-email',
@@ -200,7 +200,7 @@ this.logger.info(
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
@@ -228,15 +228,18 @@ this.logger.info(
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
   @OnEvent('report.employee-performance')
-  async handlePerformanceSummary(payload: { performanceData: any[]; recipients: any[] }) {
+  async handlePerformanceSummary(payload: {
+    performanceData: any[];
+    recipients: any[];
+  }) {
     this.logger.info('Queuing employee performance summary');
 
-    const emails = payload.recipients.map(r => r.email);
+    const emails = payload.recipients.map((r) => r.email);
 
     await this.emailQueue.add(
       'send-email',
@@ -244,7 +247,9 @@ this.logger.info(
         to: emails,
         template: 'employee-performance',
         data: {
-          performanceData: payload.performanceData.sort((a, b) => b.totalSales - a.totalSales),
+          performanceData: payload.performanceData.sort(
+            (a, b) => b.totalSales - a.totalSales,
+          ),
         },
       },
       {
@@ -253,13 +258,15 @@ this.logger.info(
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
   @OnEvent('alert.slow-moving-inventory')
   async handleSlowMovingInventoryAlert(items: any[]) {
-    this.logger.info(`Queuing slow-moving inventory alert for ${items.length} items`);
+    this.logger.info(
+      `Queuing slow-moving inventory alert for ${items.length} items`,
+    );
 
     await this.emailQueue.add(
       'send-email',
@@ -277,7 +284,7 @@ this.logger.info(
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 
@@ -285,7 +292,7 @@ this.logger.info(
   async handleShrinkageReport(payload: { report: any; recipients: any[] }) {
     this.logger.info('Queuing shrinkage report');
 
-    const emails = payload.recipients.map(r => r.email);
+    const emails = payload.recipients.map((r) => r.email);
 
     await this.emailQueue.add(
       'send-email',
@@ -307,7 +314,7 @@ this.logger.info(
           type: 'exponential',
           delay: 2000,
         },
-      }
+      },
     );
   }
 

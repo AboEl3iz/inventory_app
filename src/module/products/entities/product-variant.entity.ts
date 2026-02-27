@@ -6,7 +6,8 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Product } from './product.entity';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Product } from './product.entity';
 import { ProductVariantValue } from './product-variant-value.entity';
 import { Inventory } from 'src/module/inventory/entities/inventory.entity';
 import { InvoiceItem } from 'src/module/invoices/entities/invoice_items.entity';
@@ -34,24 +35,26 @@ export class ProductVariant extends BaseEntity {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
-  @ManyToOne(() => Product, product => product.variants, {
+  @ManyToOne(() => Product, (product) => product.variants, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'productId' })
   product: Product;
 
-  @OneToMany(() => ProductVariantValue, value => value.variant, { cascade: true })
+  @OneToMany(() => ProductVariantValue, (value) => value.variant, {
+    cascade: true,
+  })
   values: ProductVariantValue[];
 
-  @OneToMany(() => Inventory, inventory => inventory.variant)
+  @OneToMany(() => Inventory, (inventory) => inventory.variant)
   inventories: Inventory[];
 
-  @OneToMany(() => InvoiceItem, item => item.variant)
+  @OneToMany(() => InvoiceItem, (item) => item.variant)
   invoiceItems: InvoiceItem[];
 
-  @OneToMany(() => PurchaseItem, item => item.variant)
+  @OneToMany(() => PurchaseItem, (item) => item.variant)
   purchaseItems: PurchaseItem[];
 
-  @OneToMany(() => StockMovement, movement => movement.variant)
+  @OneToMany(() => StockMovement, (movement) => movement.variant)
   stockMovements: StockMovement[];
 }

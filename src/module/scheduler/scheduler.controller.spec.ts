@@ -13,14 +13,18 @@ describe('SchedulerController', () => {
         {
           provide: SchedulerService,
           useValue: {
-            addCustomJob: jest.fn(), removeJob: jest.fn(),
-            getJobs: jest.fn(), pauseJob: jest.fn(), resumeJob: jest.fn(),
+            addCustomJob: jest.fn(),
+            removeJob: jest.fn(),
+            getJobs: jest.fn(),
+            pauseJob: jest.fn(),
+            resumeJob: jest.fn(),
           },
         },
         {
           provide: NotificationService,
           useValue: {
-            sendLowStockAlert: jest.fn(), handleLowStockAlert: jest.fn(),
+            sendLowStockAlert: jest.fn(),
+            handleLowStockAlert: jest.fn(),
           },
         },
       ],

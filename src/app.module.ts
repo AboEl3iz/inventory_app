@@ -11,7 +11,12 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 // ─── Shared Modules ───
 import { StorageModule } from './shared/storage/storage.module';
-import { PURCHASES_QUEUE, INVOICES_QUEUE, LOW_STOCK_QUEUE, EMAIL_QUEUE } from './shared/event.constants';
+import {
+  PURCHASES_QUEUE,
+  INVOICES_QUEUE,
+  LOW_STOCK_QUEUE,
+  EMAIL_QUEUE,
+} from './shared/event.constants';
 
 // ─── Feature Modules ───
 import { ProductsModule } from './module/products/products.module';
@@ -115,4 +120,4 @@ import * as winston from 'winston';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

@@ -23,7 +23,6 @@ import { ProductImage } from './module/products/entities/product-images.entity';
 
 // 🧩 Entities (adjust import path)
 
-
 const AppDataSource = new DataSource({
   type: 'postgres',
   host: 'localhost',
@@ -79,14 +78,18 @@ async function seed() {
       name: `${city} Branch`,
       address: faker.location.streetAddress({ useFullAddress: true }),
       phone: faker.phone.number(),
-    }))
+    })),
   );
   await branchRepo.save(branches);
 
   // 👥 Users + Auth
   const userRepo = AppDataSource.getRepository(User);
   const authRepo = AppDataSource.getRepository(Auth);
-  const roles: ('admin' | 'manager' | 'cashier')[] = ['admin', 'manager', 'cashier'];
+  const roles: ('admin' | 'manager' | 'cashier')[] = [
+    'admin',
+    'manager',
+    'cashier',
+  ];
   const users: User[] = [];
 
   for (const branch of branches) {
@@ -118,15 +121,25 @@ async function seed() {
       contactPerson: faker.person.fullName(),
       phone: faker.phone.number(),
       email: faker.internet.email(),
-    })
+    }),
   );
   await supplierRepo.save(suppliers);
 
   // 🗂️ Categories
   const categoryRepo = AppDataSource.getRepository(Category);
-  const categoryNames = ['Electronics', 'Accessories', 'Furniture', 'Clothing', 'Home Appliances', 'Laptops', 'Smartphones', 'Audio', 'Gaming'];
+  const categoryNames = [
+    'Electronics',
+    'Accessories',
+    'Furniture',
+    'Clothing',
+    'Home Appliances',
+    'Laptops',
+    'Smartphones',
+    'Audio',
+    'Gaming',
+  ];
   const categories = categoryRepo.create(
-    categoryNames.map((n) => ({ name: n }))
+    categoryNames.map((n) => ({ name: n })),
   );
   await categoryRepo.save(categories);
 
@@ -152,7 +165,7 @@ async function seed() {
     attrs.push(attr);
 
     const values = def.values.map((val) =>
-      attrValRepo.create({ value: val, attribute: attr })
+      attrValRepo.create({ value: val, attribute: attr }),
     );
     await attrValRepo.save(values);
     attrValues.push(...values);
@@ -161,7 +174,7 @@ async function seed() {
   // 🛍️ Products
   const productRepo = AppDataSource.getRepository(Product);
   const productNames = Array.from({ length: 60 }, () =>
-    faker.commerce.productName()
+    faker.commerce.productName(),
   );
   const products: Product[] = [];
 
@@ -192,7 +205,8 @@ async function seed() {
       const variant = variantRepo.create({
         sku: faker.string.alphanumeric(10).toUpperCase(),
         barcode: faker.string.numeric(13),
-        price: (Number(product.basePrice) + faker.number.int({ min: 100, max: 1000 })),
+        price:
+          Number(product.basePrice) + faker.number.int({ min: 100, max: 1000 }),
         costPrice: product.basePrice,
         isActive: true,
         product,
@@ -203,7 +217,7 @@ async function seed() {
       const chosenAttrs = faker.helpers.arrayElements(attrValues, 2);
       for (const av of chosenAttrs) {
         await variantValRepo.save(
-          variantValRepo.create({ variant, attributeValue: av })
+          variantValRepo.create({ variant, attributeValue: av }),
         );
       }
     }
@@ -262,7 +276,7 @@ async function seed() {
         variant: v,
         quantity: qty,
         unitCost: v.costPrice,
-        subtotal: (Number(v.costPrice) * qty),
+        subtotal: Number(v.costPrice) * qty,
       });
       await purchaseItemRepo.save(item);
     }
@@ -273,7 +287,9 @@ async function seed() {
   const invoiceItemRepo = AppDataSource.getRepository(InvoiceItem);
   for (let i = 0; i < 150; i++) {
     const branch = faker.helpers.arrayElement(branches);
-    const user = faker.helpers.arrayElement(users.filter(u => u.branch.id === branch.id));
+    const user = faker.helpers.arrayElement(
+      users.filter((u) => u.branch.id === branch.id),
+    );
     const invoice = invoiceRepo.create({
       invoiceNumber: `INV-${faker.string.numeric(6)}`,
       branch,
@@ -293,7 +309,7 @@ async function seed() {
         variant: v,
         quantity: qty,
         unitPrice: v.price,
-        subtotal: (Number(v.price) * qty),
+        subtotal: Number(v.price) * qty,
       });
       await invoiceItemRepo.save(item);
     }

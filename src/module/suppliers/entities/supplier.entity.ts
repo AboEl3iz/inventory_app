@@ -1,5 +1,6 @@
 import { Entity, Column, OneToMany } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Product } from '../../products/entities/product.entity';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Product } from '../../products/entities/product.entity';
 import { Purchase } from '../../purchases/entities/purchase.entity';
 
 @Entity('suppliers')
@@ -22,9 +23,9 @@ export class Supplier extends BaseEntity {
   @Column({ default: true })
   isActive: boolean;
 
-  @OneToMany(() => Product, product => product.supplier)
+  @OneToMany(() => Product, (product) => product.supplier)
   products: Product[];
 
-  @OneToMany(() => Purchase, purchase => purchase.supplier)
+  @OneToMany(() => Purchase, (purchase) => purchase.supplier)
   purchases: Purchase[];
 }

@@ -18,12 +18,12 @@ import { BullModule, BullRegistrar } from '@nestjs/bullmq';
 
 @Module({
   controllers: [SchedulerController],
-  providers: [SchedulerService,NotificationService],
+  providers: [SchedulerService, NotificationService],
   imports: [
-  BullModule.registerQueue({ name: 'EMAIL_QUEUE' }),
+    BullModule.registerQueue({ name: 'EMAIL_QUEUE' }),
     ReportsModule,
-        WinstonModule,
-        ScheduleModule.forRoot(),
+    WinstonModule,
+    ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     TypeOrmModule.forFeature([
       Inventory,
@@ -33,8 +33,7 @@ import { BullModule, BullRegistrar } from '@nestjs/bullmq';
       ProductVariant,
       Branch,
       User,
-      
-    ])
+    ]),
   ],
 })
 export class SchedulerModule {}

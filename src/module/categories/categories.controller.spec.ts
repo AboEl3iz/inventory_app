@@ -12,9 +12,15 @@ describe('CategoriesController', () => {
         {
           provide: CategoriesService,
           useValue: {
-            create: jest.fn(), findAll: jest.fn(), findOne: jest.fn(),
-            update: jest.fn(), remove: jest.fn(), restore: jest.fn(),
-            findFlat: jest.fn(), stats: jest.fn(), search: jest.fn(),
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+            restore: jest.fn(),
+            findFlat: jest.fn(),
+            stats: jest.fn(),
+            search: jest.fn(),
             getCategoryTree: jest.fn(),
           },
         },

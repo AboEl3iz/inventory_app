@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsNumber, IsUUID, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsUUID,
+  IsBoolean,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateVariantDto {
@@ -6,7 +12,11 @@ export class CreateVariantDto {
   @IsString()
   sku: string;
 
-  @ApiProperty({ description: 'Product barcode', example: '1234567890123', required: false })
+  @ApiProperty({
+    description: 'Product barcode',
+    example: '1234567890123',
+    required: false,
+  })
   @IsOptional()
   @IsString()
   barcode?: string;
@@ -15,7 +25,7 @@ export class CreateVariantDto {
   @IsNumber()
   price: number;
 
-  @ApiProperty({ description: 'Cost price', example: 50.00 })
+  @ApiProperty({ description: 'Cost price', example: 50.0 })
   @IsNumber()
   costPrice: number;
 
@@ -23,12 +33,20 @@ export class CreateVariantDto {
   @IsNumber()
   stockQuantity: number;
 
-  @ApiProperty({ description: 'Whether variant is active', example: true, required: false })
+  @ApiProperty({
+    description: 'Whether variant is active',
+    example: true,
+    required: false,
+  })
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
 
-  @ApiProperty({ description: 'Product UUID', example: '550e8400-e29b-41d4-a716-446655440000', required: false })
+  @ApiProperty({
+    description: 'Product UUID',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    required: false,
+  })
   @IsUUID()
   @IsOptional()
   productId?: string;

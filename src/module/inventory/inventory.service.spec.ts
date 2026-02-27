@@ -29,7 +29,10 @@ describe('InventoryService', () => {
         { provide: getRepositoryToken(ProductVariant), useFactory: mockRepo },
         { provide: getRepositoryToken(Branch), useFactory: mockRepo },
         { provide: getRepositoryToken(StockMovement), useFactory: mockRepo },
-        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() } },
+        {
+          provide: CACHE_MANAGER,
+          useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
+        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();

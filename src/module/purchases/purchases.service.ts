@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -8,12 +13,22 @@ import { Branch } from '../branches/entities/branch.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { Purchase } from './entities/purchase.entity';
-import { PURCHASE_CANCELLED, PURCHASE_COMPLETED } from 'src/shared/event.constants';
+import {
+  PURCHASE_CANCELLED,
+  PURCHASE_COMPLETED,
+} from 'src/shared/event.constants';
 import { PurchaseItem } from './entities/purchase-item.entity';
 import { User } from '../users/entities/user.entity';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { InjectQueue } from '@nestjs/bullmq';
-import { CancelPurchaseResponse, CompletePurchaseResponse, CreatePurchaseResponse, DeletePurchaseResponse, PurchaseDetailResponse, PurchaseListItemResponse } from 'src/shared/interfaces/purchases-response';
+import {
+  CancelPurchaseResponse,
+  CompletePurchaseResponse,
+  CreatePurchaseResponse,
+  DeletePurchaseResponse,
+  PurchaseDetailResponse,
+  PurchaseListItemResponse,
+} from 'src/shared/interfaces/purchases-response';
 import { IUserPayload } from 'src/shared/interfaces/user-payload.interface';
 
 @Injectable()
@@ -27,9 +42,12 @@ export class PurchasesService {
     private variantRepo: Repository<ProductVariant>,
     private eventEmitter: EventEmitter2,
     @InjectQueue('PURCHASES_QUEUE') private purchasesQueue,
-  ) { }
+  ) {}
 
-  async createPurchase(dto: CreatePurchaseDto, user: IUserPayload): Promise<CreatePurchaseResponse> {
+  async createPurchase(
+    dto: CreatePurchaseDto,
+    user: IUserPayload,
+  ): Promise<CreatePurchaseResponse> {
     // التحقق من صلاحية إنشاء مشتريات في الفرع
     if (user.role !== Role.admin && dto.branchId !== user.branchId) {
       throw new ForbiddenException('Cannot create purchase for another branch');
@@ -48,7 +66,10 @@ export class PurchasesService {
       const [supplier, branch, variants] = await Promise.all([
         manager.findOne(Supplier, { where: { id: dto.supplierId } }),
         manager.findOne(Branch, { where: { id: dto.branchId } }),
-        manager.find(ProductVariant, { where: { id: In(variantIds) }, relations: ['product'] }),
+        manager.find(ProductVariant, {
+          where: { id: In(variantIds) },
+          relations: ['product'],
+        }),
       ]);
 
       // التحقق من وجود المورد والفرع
@@ -122,7 +143,11 @@ export class PurchasesService {
 
       const savedItems = await manager.save(PurchaseItem, purchaseItems);
       for (const item of savedItems) {
-        await manager.update(ProductVariant, { id: item.variant.id }, { costPrice: item.unitCost });
+        await manager.update(
+          ProductVariant,
+          { id: item.variant.id },
+          { costPrice: item.unitCost },
+        );
       }
 
       // إرجاع الفاتورة مع العناصر بصيغة الـ Response
@@ -141,7 +166,7 @@ export class PurchasesService {
         totalAmount: savedPurchase.totalAmount,
         status: savedPurchase.status,
         notes: savedPurchase.notes,
-        items: savedItems.map(item => ({
+        items: savedItems.map((item) => ({
           id: item.id,
           variantId: item.variant.id,
           sku: item.variant.sku,
@@ -156,7 +181,10 @@ export class PurchasesService {
     });
   }
 
-  async completePurchase(id: string, user: IUserPayload): Promise<CompletePurchaseResponse> {
+  async completePurchase(
+    id: string,
+    user: IUserPayload,
+  ): Promise<CompletePurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['items', 'items.variant', 'branch', 'supplier'],
@@ -231,7 +259,7 @@ export class PurchasesService {
 
     const purchases = await query.getMany();
 
-    return purchases.map(purchase => ({
+    return purchases.map((purchase) => ({
       id: purchase.id,
       purchaseNumber: purchase.purchaseNumber,
       supplierName: purchase.supplier.name,
@@ -248,7 +276,10 @@ export class PurchasesService {
     }));
   }
 
-  async findOne(id: string, user: IUserPayload): Promise<PurchaseDetailResponse> {
+  async findOne(
+    id: string,
+    user: IUserPayload,
+  ): Promise<PurchaseDetailResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: [
@@ -292,7 +323,7 @@ export class PurchasesService {
         email: purchase.user.email,
         role: purchase.user.role,
       },
-      items: purchase.items.map(item => ({
+      items: purchase.items.map((item) => ({
         id: item.id,
         variant: {
           id: item.variant.id,
@@ -321,7 +352,10 @@ export class PurchasesService {
     };
   }
 
-  async cancelPurchase(id: string, user: IUserPayload): Promise<CancelPurchaseResponse> {
+  async cancelPurchase(
+    id: string,
+    user: IUserPayload,
+  ): Promise<CancelPurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['branch', 'items', 'items.variant'],
@@ -371,7 +405,10 @@ export class PurchasesService {
     };
   }
 
-  async remove(id: string, user: IUserPayload): Promise<DeletePurchaseResponse> {
+  async remove(
+    id: string,
+    user: IUserPayload,
+  ): Promise<DeletePurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['branch'],

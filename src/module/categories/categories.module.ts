@@ -9,10 +9,7 @@ import { CacheModule } from '@nestjs/cache-manager';
   providers: [CategoriesService],
   imports: [
     TypeOrmModule.forFeature([Category]),
-    CacheModule.register(
-      { ttl: 5 * 60 , isGlobal: true }
-    ),
-    
+    CacheModule.register({ ttl: 5 * 60, isGlobal: true }),
   ],
 })
 export class CategoriesModule {}

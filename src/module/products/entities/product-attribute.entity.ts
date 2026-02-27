@@ -1,11 +1,6 @@
-import {
-  Entity,
-  Column,
-  ManyToOne,
-  OneToMany,
-  JoinColumn,
-} from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Category } from '../../categories/entities/category.entity';
+import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Category } from '../../categories/entities/category.entity';
 import { ProductAttributeValue } from './product-attribute-value.entity';
 
 @Entity('product_attributes')
@@ -13,12 +8,12 @@ export class ProductAttribute extends BaseEntity {
   @Column()
   name: string;
 
-  @ManyToOne(() => Category, category => category.attributes, {
+  @ManyToOne(() => Category, (category) => category.attributes, {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'categoryId' })
   category: Category;
 
-  @OneToMany(() => ProductAttributeValue, value => value.attribute)
+  @OneToMany(() => ProductAttributeValue, (value) => value.attribute)
   values: ProductAttributeValue[];
 }

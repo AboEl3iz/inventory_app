@@ -14,8 +14,13 @@ import { DataSource } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 const mockRepo = () => ({
-  find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(),
-  update: jest.fn(), remove: jest.fn(), createQueryBuilder: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
+  update: jest.fn(),
+  remove: jest.fn(),
+  createQueryBuilder: jest.fn(),
 });
 
 describe('InvoicesService', () => {
@@ -34,7 +39,10 @@ describe('InvoicesService', () => {
         { provide: getRepositoryToken(ProductVariant), useFactory: mockRepo },
         { provide: getRepositoryToken(Inventory), useFactory: mockRepo },
         { provide: getRepositoryToken(StockMovement), useFactory: mockRepo },
-        { provide: CACHE_MANAGER, useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() } },
+        {
+          provide: CACHE_MANAGER,
+          useValue: { get: jest.fn(), set: jest.fn(), del: jest.fn() },
+        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: 'BullQueue_INVOICES_QUEUE', useValue: { add: jest.fn() } },
       ],

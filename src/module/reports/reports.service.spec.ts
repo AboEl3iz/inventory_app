@@ -8,7 +8,10 @@ import { InvoiceItem } from '../invoices/entities/invoice_items.entity';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 
 const mockRepo = () => ({
-  find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
   createQueryBuilder: jest.fn(),
 });
 
@@ -23,7 +26,15 @@ describe('ReportService', () => {
         { provide: getRepositoryToken(Purchase), useFactory: mockRepo },
         { provide: getRepositoryToken(StockMovement), useFactory: mockRepo },
         { provide: getRepositoryToken(InvoiceItem), useFactory: mockRepo },
-        { provide: WINSTON_MODULE_PROVIDER, useValue: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() } },
+        {
+          provide: WINSTON_MODULE_PROVIDER,
+          useValue: {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

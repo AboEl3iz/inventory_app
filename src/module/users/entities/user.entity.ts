@@ -1,5 +1,13 @@
-import { Entity, Column, OneToMany, ManyToOne, JoinColumn, OneToOne } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Invoice } from '../../invoices/entities/invoice.entity';
+import {
+  Entity,
+  Column,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+  OneToOne,
+} from 'typeorm';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Invoice } from '../../invoices/entities/invoice.entity';
 import { Purchase } from '../../purchases/entities/purchase.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 import { Auth } from '../../auth/entities/auth.entity';
@@ -16,22 +24,22 @@ export class User extends BaseEntity {
   @Column()
   password: string;
 
-  @OneToOne(() => Auth, auth => auth.user, { cascade: true })
+  @OneToOne(() => Auth, (auth) => auth.user, { cascade: true })
   auth: Auth;
 
-  @ManyToOne(() => Branch, branch => branch.users)
+  @ManyToOne(() => Branch, (branch) => branch.users)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
   @Column({ default: 'admin' })
   role: 'admin' | 'manager' | 'cashier';
 
-  @OneToMany(() => Invoice, invoice => invoice.user)
+  @OneToMany(() => Invoice, (invoice) => invoice.user)
   invoices: Invoice[];
 
-  @OneToMany(() => Purchase, purchase => purchase.user)
+  @OneToMany(() => Purchase, (purchase) => purchase.user)
   purchases: Purchase[];
 
-  @OneToMany(() => StockMovement, movement => movement.user)
+  @OneToMany(() => StockMovement, (movement) => movement.user)
   stockMovements: StockMovement[];
 }

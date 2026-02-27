@@ -1,10 +1,20 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Branch } from './entities/branch.entity';
 import { Repository } from 'typeorm';
-import { IBranchResponse, IBranchStatsResponse, IBranchWithRelationsResponse } from 'src/shared/interfaces/branch-response';
+import {
+  IBranchResponse,
+  IBranchStatsResponse,
+  IBranchWithRelationsResponse,
+} from 'src/shared/interfaces/branch-response';
 import { Inventory } from '../inventory/entities/inventory.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { Product } from '../products/entities/product.entity';
@@ -25,13 +35,18 @@ export class BranchesService {
     @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
-    @InjectRepository(Invoice) private readonly invoiceRepository: Repository<Invoice>,
+    @InjectRepository(Invoice)
+    private readonly invoiceRepository: Repository<Invoice>,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: WinstonLogger,
-  ) { }
-  async create(createBranchDto: CreateBranchDto, userId: string): Promise<IBranchResponse> {
-
-    if (await this.branchrepo.findOne({ where: { name: createBranchDto.name } })) {
+  ) {}
+  async create(
+    createBranchDto: CreateBranchDto,
+    userId: string,
+  ): Promise<IBranchResponse> {
+    if (
+      await this.branchrepo.findOne({ where: { name: createBranchDto.name } })
+    ) {
       throw new BadRequestException('Branch name already exists');
     }
 
@@ -48,7 +63,7 @@ export class BranchesService {
 
   async findAll(): Promise<IBranchResponse[]> {
     const branches = await this.branchrepo.find();
-    return branches.map(branch => ({
+    return branches.map((branch) => ({
       id: branch.id,
       name: branch.name,
       address: branch.address,
@@ -60,7 +75,7 @@ export class BranchesService {
     // Validate branch exists and manager has access
     const branch = await this.branchrepo.findOne({
       where: { id: branchId },
-      relations: ['users']
+      relations: ['users'],
     });
 
     if (!branch) {
@@ -70,11 +85,13 @@ export class BranchesService {
     // Verify manager has access to this branch
     const manager = await this.userRepository.findOne({
       where: { id: managerpayload.id },
-      relations: ['branch']
+      relations: ['branch'],
     });
-    this.logger.debug(`Manager branch ID: ${manager?.branch?.id}, Requested branch ID: ${branchId}, role: ${managerpayload.role}`);
+    this.logger.debug(
+      `Manager branch ID: ${manager?.branch?.id}, Requested branch ID: ${branchId}, role: ${managerpayload.role}`,
+    );
 
-    if ((managerpayload.role !== "admin") && (manager!.branch?.id !== branchId)) {
+    if (managerpayload.role !== 'admin' && manager!.branch?.id !== branchId) {
       throw new ForbiddenException('You do not have access to this branch');
     }
 
@@ -113,9 +130,8 @@ export class BranchesService {
 
       // Calculate potential profit (not actual profit - that comes from sales)
       const potentialProfit = (sellingPrice - costPrice) * inv.quantity;
-      const profitMargin = costPrice !== 0
-        ? ((sellingPrice - costPrice) / costPrice) * 100
-        : 0;
+      const profitMargin =
+        costPrice !== 0 ? ((sellingPrice - costPrice) / costPrice) * 100 : 0;
 
       // Calculate inventory values
       totalInventoryValue += sellingPrice * inv.quantity;
@@ -159,7 +175,7 @@ export class BranchesService {
         potentialProfit: Number(totalPotentialProfit.toFixed(2)),
         potentialLoss: Number(totalPotentialLoss.toFixed(2)),
         actualProfit: Number(actualProfit.toFixed(2)),
-        lowStockCount: productStats.filter(p => p.thresholdPassed).length,
+        lowStockCount: productStats.filter((p) => p.thresholdPassed).length,
       },
       products: productStats,
     };
@@ -178,13 +194,18 @@ export class BranchesService {
     };
   }
 
-  async update(id: string, updateBranchDto: UpdateBranchDto): Promise<IBranchResponse> {
+  async update(
+    id: string,
+    updateBranchDto: UpdateBranchDto,
+  ): Promise<IBranchResponse> {
     const branch = await this.branchrepo.findOne({ where: { id } });
     if (!branch) {
       throw new BadRequestException('Branch not found');
     }
     if (updateBranchDto.name && updateBranchDto.name !== branch.name) {
-      if (await this.branchrepo.findOne({ where: { name: updateBranchDto.name } })) {
+      if (
+        await this.branchrepo.findOne({ where: { name: updateBranchDto.name } })
+      ) {
         throw new BadRequestException('Branch name already exists');
       }
       branch.name = updateBranchDto.name;
@@ -220,7 +241,7 @@ export class BranchesService {
     const invoices = await this.invoiceRepository.find({
       where: {
         branch: { id: branchId },
-        status: 'paid' // Only count paid invoices
+        status: 'paid', // Only count paid invoices
       },
       relations: ['items', 'items.variant'],
     });

@@ -50,7 +50,15 @@ describe('SuppliersService', () => {
         { provide: getRepositoryToken(Purchase), useValue: mockPurchaseRepo },
         { provide: getRepositoryToken(Product), useValue: mockProductRepo },
         { provide: getRepositoryToken(Branch), useValue: mockBranchRepo },
-        { provide: WINSTON_MODULE_NEST_PROVIDER, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() } },
+        {
+          provide: WINSTON_MODULE_NEST_PROVIDER,
+          useValue: {
+            log: jest.fn(),
+            error: jest.fn(),
+            warn: jest.fn(),
+            debug: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -120,7 +128,9 @@ describe('SuppliersService', () => {
     it('should throw NotFoundException if supplier not found', async () => {
       mockSupplierRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.findOne('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -131,7 +141,9 @@ describe('SuppliersService', () => {
       mockSupplierRepo.preload.mockResolvedValue(updated);
       mockSupplierRepo.save.mockResolvedValue(updated);
 
-      const result = await service.update('sup-1', { name: 'Updated Supplier' });
+      const result = await service.update('sup-1', {
+        name: 'Updated Supplier',
+      });
 
       expect(result.name).toBe('Updated Supplier');
     });
@@ -160,7 +172,9 @@ describe('SuppliersService', () => {
     it('should throw NotFoundException if supplier not found for remove', async () => {
       mockSupplierRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

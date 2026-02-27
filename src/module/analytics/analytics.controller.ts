@@ -1,36 +1,59 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, ValidationPipe, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ValidationPipe,
+  Req,
+} from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import {  DashboardQueryDto } from './dto/create-analytics.dto';
+import { DashboardQueryDto } from './dto/create-analytics.dto';
 import { AuthenticationGuard } from 'src/common/guard/authentication.guard';
 import { AuthorizationGuard } from 'src/common/guard/authorization.guard';
 import { Role, Roles } from 'src/common/decorator/roles.decorator';
 import { TrendQueryDto } from './dto/trend-query.dto';
 import { InventoryQueryDto } from './dto/inventory-query.dto';
-import { ApiResponse , ApiOperation , ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 @Controller('analytics')
 @ApiTags('Analytics')
 @ApiBearerAuth('access-token')
 @UseGuards()
-@UseGuards(AuthenticationGuard,AuthorizationGuard)
+@UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class AnalyticsController {
   dashboardService: any;
   constructor(private readonly analyticsService: AnalyticsService) {}
 
-   // ==================== OVERVIEW DASHBOARD ====================
+  // ==================== OVERVIEW DASHBOARD ====================
 
   @Get('overview')
   @Roles(Role.admin, Role.manager)
   @ApiOperation({ summary: 'Get dashboard overview with KPIs' })
   @ApiResponse({ status: 200, description: 'Dashboard overview data' })
-  @ApiQuery({ name: 'period', enum: ['today', 'week', 'month', 'year', 'custom'], required: false })
+  @ApiQuery({
+    name: 'period',
+    enum: ['today', 'week', 'month', 'year', 'custom'],
+    required: false,
+  })
   @ApiQuery({ name: 'branchId', required: false })
   async getOverview(
     @Query(ValidationPipe) query: DashboardQueryDto,
     @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getOverview({
@@ -42,18 +65,17 @@ export class AnalyticsController {
     };
   }
 
-  
-
   @Get('widgets')
   @Roles(Role.admin, Role.manager)
   @ApiOperation({ summary: 'Get all dashboard widgets data' })
-  @ApiResponse({ status: 200, description: 'Dashboard widgets'   })
+  @ApiResponse({ status: 200, description: 'Dashboard widgets' })
   async getWidgets(
     @Query(ValidationPipe) query: DashboardQueryDto,
     @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getAllWidgets({
@@ -73,8 +95,9 @@ export class AnalyticsController {
     @Query(ValidationPipe) query: TrendQueryDto,
     @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getSalesTrends({
@@ -92,10 +115,11 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Sales by category' })
   async getSalesByCategory(
     @Query(ValidationPipe) query: DashboardQueryDto,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getSalesByCategory({
@@ -124,10 +148,11 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Sales by user' })
   async getSalesByUser(
     @Query(ValidationPipe) query: DashboardQueryDto,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getSalesByUser({
@@ -137,7 +162,6 @@ export class AnalyticsController {
     };
   }
 
-
   // ==================== INVENTORY DASHBOARD ====================
 
   @Get('inventory/status')
@@ -146,10 +170,11 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Inventory status' })
   async getInventoryStatus(
     @Query(ValidationPipe) query: InventoryQueryDto,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getInventoryStatus({
@@ -163,12 +188,10 @@ export class AnalyticsController {
   @Roles(Role.admin, Role.manager)
   @ApiOperation({ summary: 'Get low stock items' })
   @ApiResponse({ status: 200, description: 'Low stock items list' })
-  async getLowStockItems(
-    @Query('branchId') branchId: string,
-     @Req() req: any,
-  ) {
-    const effectiveBranchId = req.user.role === 'manager' ? req.user.branchId : branchId;
-    
+  async getLowStockItems(@Query('branchId') branchId: string, @Req() req: any) {
+    const effectiveBranchId =
+      req.user.role === 'manager' ? req.user.branchId : branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getLowStockItems(effectiveBranchId),
@@ -179,14 +202,19 @@ export class AnalyticsController {
   @Roles(Role.admin, Role.manager)
   @ApiOperation({ summary: 'Get inventory movements history' })
   @ApiResponse({ status: 200, description: 'Inventory movements' })
-  @ApiQuery({ name: 'type', enum: ['all', 'sale', 'purchase', 'adjustment', 'transfer', 'damage'], required: false })
+  @ApiQuery({
+    name: 'type',
+    enum: ['all', 'sale', 'purchase', 'adjustment', 'transfer', 'damage'],
+    required: false,
+  })
   async getInventoryMovements(
     @Query(ValidationPipe) query: DashboardQueryDto,
     @Query('type') type: string,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getInventoryMovements({
@@ -204,13 +232,16 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Inventory value' })
   async getInventoryValuation(
     @Query('branchId') branchId: string,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const effectiveBranchId = req.user.role === 'manager' ? req.user.branchId : branchId;
-    
+    const effectiveBranchId =
+      req.user.role === 'manager' ? req.user.branchId : branchId;
+
     return {
       success: true,
-      data: await this.analyticsService.getInventoryValuation(effectiveBranchId),
+      data: await this.analyticsService.getInventoryValuation(
+        effectiveBranchId,
+      ),
     };
   }
 
@@ -220,10 +251,11 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Turnover metrics' })
   async getInventoryTurnover(
     @Query(ValidationPipe) query: DashboardQueryDto,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getInventoryTurnover({
@@ -233,7 +265,6 @@ export class AnalyticsController {
     };
   }
 
-  
   // ==================== PRODUCT PERFORMANCE ====================
 
   @Get('products/top-selling')
@@ -246,10 +277,11 @@ export class AnalyticsController {
     @Query(ValidationPipe) query: DashboardQueryDto,
     @Query('limit') limit: number = 10,
     @Query('sortBy') sortBy: 'revenue' | 'quantity' = 'revenue',
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getTopSellingProducts({
@@ -267,10 +299,11 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Product performance' })
   async getProductPerformance(
     @Query(ValidationPipe) query: DashboardQueryDto,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getProductPerformance({
@@ -286,10 +319,11 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Profit margin data' })
   async getProfitMarginByProduct(
     @Query(ValidationPipe) query: DashboardQueryDto,
-     @Req() req: any,
+    @Req() req: any,
   ) {
-    const branchId = req.user.role === 'manager' ? req.user.branchId : query.branchId;
-    
+    const branchId =
+      req.user.role === 'manager' ? req.user.branchId : query.branchId;
+
     return {
       success: true,
       data: await this.analyticsService.getProfitMarginByProduct({
@@ -298,7 +332,4 @@ export class AnalyticsController {
       }),
     };
   }
-
-  
 }
-

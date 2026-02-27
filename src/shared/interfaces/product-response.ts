@@ -57,7 +57,6 @@ export interface ProductSearchResponse {
   name: string;
   brand: string;
   basePrice: number;
-  
 }
 
 // Product Detail Response

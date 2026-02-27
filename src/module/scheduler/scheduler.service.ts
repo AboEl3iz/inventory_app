@@ -5,7 +5,10 @@ import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, MoreThan, Between } from 'typeorm';
 import { CronJob } from 'cron';
-import { WINSTON_MODULE_NEST_PROVIDER, WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import {
+  WINSTON_MODULE_NEST_PROVIDER,
+  WINSTON_MODULE_PROVIDER,
+} from 'nest-winston';
 import { Logger } from 'winston';
 import moment from 'moment';
 
@@ -21,7 +24,6 @@ import { NotificationService } from './notification.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 @Injectable()
 export class SchedulerService {
-
   constructor(
     @InjectRepository(Inventory)
     private inventoryRepo: Repository<Inventory>,
@@ -43,7 +45,7 @@ export class SchedulerService {
     @Inject(WINSTON_MODULE_PROVIDER)
     private readonly logger: Logger,
     private eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   // ==================== LOW STOCK ALERTS ====================
 
@@ -78,7 +80,9 @@ export class SchedulerService {
         await this.inventoryRepo.save(item);
       }
 
-      this.logger.info(`Low stock check completed. ${lowStockItems.length} alerts sent.`);
+      this.logger.info(
+        `Low stock check completed. ${lowStockItems.length} alerts sent.`,
+      );
     } catch (error) {
       this.logger.error('Error in low stock check:', error);
     }
@@ -91,7 +95,7 @@ export class SchedulerService {
     try {
       await this.inventoryRepo.update(
         { lowStockAlertSent: true },
-        { lowStockAlertSent: false }
+        { lowStockAlertSent: false },
       );
 
       this.logger.info('Low stock alerts reset successfully');
@@ -101,7 +105,7 @@ export class SchedulerService {
   }
 
   @Cron(CronExpression.EVERY_WEEK)
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   async generateReorderSuggestions() {
     this.logger.info('Generating auto-reorder suggestions...');
 
@@ -120,7 +124,7 @@ export class SchedulerService {
       for (const [supplierId, items] of Object.entries(supplierGroups)) {
         const purchaseOrder = {
           supplier: items[0].variant.product.supplier,
-          items: items.map(item => ({
+          items: items.map((item) => ({
             variant: item.variant,
             suggestedQuantity: this.calculateReorderQuantity(item),
             currentStock: item.quantity,
@@ -131,7 +135,10 @@ export class SchedulerService {
         };
 
         // Emit event
-        await this.eventEmitter.emitAsync('inventory.reorder-suggestion', purchaseOrder);
+        await this.eventEmitter.emitAsync(
+          'inventory.reorder-suggestion',
+          purchaseOrder,
+        );
       }
 
       this.logger.info('Reorder suggestions generated successfully');
@@ -143,7 +150,7 @@ export class SchedulerService {
   // ==================== FINANCIAL REPORTS ====================
 
   @Cron('55 23 * * *')
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   async endOfDaySalesReport() {
     this.logger.info('Generating end of day sales report...');
 
@@ -151,10 +158,16 @@ export class SchedulerService {
       const today = moment().startOf('day').toDate();
       const endOfDay = moment().endOf('day').toDate();
 
-      const branches = await this.branchRepo.find({ where: { isActive: true } });
+      const branches = await this.branchRepo.find({
+        where: { isActive: true },
+      });
 
       for (const branch of branches) {
-        const report = await this.generateDailySalesReport(branch, today, endOfDay);
+        const report = await this.generateDailySalesReport(
+          branch,
+          today,
+          endOfDay,
+        );
 
         const recipients = await this.userRepo.find({
           where: [
@@ -177,7 +190,7 @@ export class SchedulerService {
   }
 
   @Cron('0 9 * * 1')
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   async weeklyRevenueReport() {
     this.logger.info('Generating weekly revenue report...');
 
@@ -185,7 +198,10 @@ export class SchedulerService {
       const startOfWeek = moment().subtract(1, 'week').startOf('week').toDate();
       const endOfWeek = moment().subtract(1, 'week').endOf('week').toDate();
 
-      const report = await this.reportService.generateWeeklyReport(startOfWeek, endOfWeek);
+      const report = await this.reportService.generateWeeklyReport(
+        startOfWeek,
+        endOfWeek,
+      );
 
       const admins = await this.userRepo.find({ where: { role: 'admin' } });
 
@@ -203,17 +219,19 @@ export class SchedulerService {
 
   @Cron('0 10 1 * *')
   // @Cron('* * * * *') // كل دقيقة
-
   async monthlyProfitLossReport() {
     this.logger.info('Generating monthly P&L report...');
 
     try {
-      const startOfMonth = moment().subtract(1, 'month').startOf('month').toDate();
+      const startOfMonth = moment()
+        .subtract(1, 'month')
+        .startOf('month')
+        .toDate();
       const endOfMonth = moment().subtract(1, 'month').endOf('month').toDate();
 
       const report = await this.reportService.generateProfitLossReport(
         startOfMonth,
-        endOfMonth
+        endOfMonth,
       );
 
       const admins = await this.userRepo.find({ where: { role: 'admin' } });
@@ -240,17 +258,23 @@ export class SchedulerService {
   }
 
   @Cron('0 11 1 1,4,7,10 *')
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   async quarterlyTaxSummary() {
     this.logger.info('Generating quarterly tax summary...');
 
     try {
-      const startOfQuarter = moment().subtract(1, 'quarter').startOf('quarter').toDate();
-      const endOfQuarter = moment().subtract(1, 'quarter').endOf('quarter').toDate();
+      const startOfQuarter = moment()
+        .subtract(1, 'quarter')
+        .startOf('quarter')
+        .toDate();
+      const endOfQuarter = moment()
+        .subtract(1, 'quarter')
+        .endOf('quarter')
+        .toDate();
 
       const taxSummary = await this.reportService.generateTaxSummary(
         startOfQuarter,
-        endOfQuarter
+        endOfQuarter,
       );
 
       const admins = await this.userRepo.find({ where: { role: 'admin' } });
@@ -293,18 +317,14 @@ export class SchedulerService {
   // }
 
   @Cron('0 3 15 * *')
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   async cleanupSoftDeleted() {
     this.logger.info('Cleaning up soft-deleted records...');
 
     try {
       const deleteDate = moment().subtract(3, 'months').toDate();
 
-      const entities = [
-        this.invoiceRepo,
-        this.purchaseRepo,
-        this.variantRepo,
-      ];
+      const entities = [this.invoiceRepo, this.purchaseRepo, this.variantRepo];
 
       let totalDeleted = 0;
       for (const repo of entities) {
@@ -351,12 +371,14 @@ export class SchedulerService {
   // ==================== PERFORMANCE MONITORING ====================
 
   @Cron('0 18 * * *')
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   async checkDailySalesTargets() {
     this.logger.info('Checking daily sales targets...');
 
     try {
-      const branches = await this.branchRepo.find({ where: { isActive: true } });
+      const branches = await this.branchRepo.find({
+        where: { isActive: true },
+      });
 
       for (const branch of branches) {
         const todaySales = await this.calculateDailySales(branch);
@@ -380,7 +402,7 @@ export class SchedulerService {
   }
 
   @Cron('0 8 * * 1')
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   async employeePerformanceSummary() {
     this.logger.info('Generating employee performance summary...');
 
@@ -404,7 +426,11 @@ export class SchedulerService {
         };
       }[] = [];
       for (const user of users) {
-        const stats = await this.calculateUserPerformance(user, startOfWeek, endOfWeek);
+        const stats = await this.calculateUserPerformance(
+          user,
+          startOfWeek,
+          endOfWeek,
+        );
         performanceData.push(stats);
       }
 
@@ -424,7 +450,7 @@ export class SchedulerService {
   }
 
   // // @Cron('0 10 10 * *')
-  // @Cron('* * * * *') 
+  // @Cron('* * * * *')
   // async slowMovingInventoryAlert() {
   //   this.logger.info('Checking for slow-moving inventory...');
 
@@ -466,7 +492,10 @@ export class SchedulerService {
     this.logger.info('Generating shrinkage tracking report...');
 
     try {
-      const startOfMonth = moment().subtract(1, 'month').startOf('month').toDate();
+      const startOfMonth = moment()
+        .subtract(1, 'month')
+        .startOf('month')
+        .toDate();
       const endOfMonth = moment().subtract(1, 'month').endOf('month').toDate();
 
       const shrinkageData = await this.stockMovementRepo.find({
@@ -477,7 +506,8 @@ export class SchedulerService {
         relations: ['variant', 'variant.product', 'branch', 'user'],
       });
 
-      const report = await this.reportService.generateShrinkageReport(shrinkageData);
+      const report =
+        await this.reportService.generateShrinkageReport(shrinkageData);
 
       const admins = await this.userRepo.find({ where: { role: 'admin' } });
 
@@ -502,34 +532,40 @@ export class SchedulerService {
   }
 
   private groupBySupplier(items: Inventory[]): Record<string, Inventory[]> {
-    return items.reduce((acc, item) => {
-      const supplierId = item.variant.product.supplier.id;
-      if (!acc[supplierId]) {
-        acc[supplierId] = [];
-      }
-      acc[supplierId].push(item);
-      return acc;
-    }, {} as Record<string, Inventory[]>);
+    return items.reduce(
+      (acc, item) => {
+        const supplierId = item.variant.product.supplier.id;
+        if (!acc[supplierId]) {
+          acc[supplierId] = [];
+        }
+        acc[supplierId].push(item);
+        return acc;
+      },
+      {} as Record<string, Inventory[]>,
+    );
   }
 
   private calculateTotalCost(items: Inventory[]): number {
     return items.reduce((total, item) => {
       const quantity = this.calculateReorderQuantity(item);
-      return total + (quantity * item.variant.costPrice);
+      return total + quantity * item.variant.costPrice;
     }, 0);
   }
 
   private async generateDailySalesReport(
     branch: Branch,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ) {
     const result = await this.invoiceRepo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalRevenue')
       .addSelect('COUNT(invoice.id)', 'totalOrders')
       .where('invoice.branchId = :branchId', { branchId: branch.id })
-      .andWhere('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .getRawOne();
 
@@ -564,7 +600,10 @@ export class SchedulerService {
     return Number(result?.total || 0);
   }
 
-  private async getSalesTarget(branch: Branch, period: 'daily' | 'weekly' | 'monthly'): Promise<number> {
+  private async getSalesTarget(
+    branch: Branch,
+    period: 'daily' | 'weekly' | 'monthly',
+  ): Promise<number> {
     // This should fetch from a targets table
     return 10000; // Placeholder
   }
@@ -572,14 +611,17 @@ export class SchedulerService {
   private async calculateUserPerformance(
     user: User,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ) {
     const result = await this.invoiceRepo
       .createQueryBuilder('invoice')
       .select('SUM(invoice.totalAmount)', 'totalSales')
       .addSelect('COUNT(invoice.id)', 'totalOrders')
       .where('invoice.userId = :userId', { userId: user.id })
-      .andWhere('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.createdAt BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      })
       .andWhere('invoice.status = :status', { status: 'paid' })
       .getRawOne();
 
@@ -606,7 +648,9 @@ export class SchedulerService {
     this.schedulerRegistry.addCronJob(name, job);
     job.start();
 
-    this.logger.info(`Custom job '${name}' added with schedule: ${cronExpression}`);
+    this.logger.info(
+      `Custom job '${name}' added with schedule: ${cronExpression}`,
+    );
   }
 
   removeJob(name: string) {
@@ -630,6 +674,3 @@ export class SchedulerService {
     this.logger.info(`Job '${name}' resumed`);
   }
 }
-
-
-

@@ -17,7 +17,7 @@ import { WinstonModule } from 'nest-winston';
   imports: [
     WinstonModule,
     AuthModule,
-    TypeOrmModule.forFeature([User , Auth]),
+    TypeOrmModule.forFeature([User, Auth]),
     JwtModule.registerAsync({
       global: true,
       imports: [ConfigModule],
@@ -25,6 +25,6 @@ import { WinstonModule } from 'nest-winston';
         await JWTConfig(configService),
       inject: [ConfigService],
     }),
-  ]
+  ],
 })
-export class UsersModule { }
+export class UsersModule {}

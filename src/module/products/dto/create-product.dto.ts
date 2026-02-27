@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsUUID, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsUUID,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateProductDto {
@@ -6,7 +12,10 @@ export class CreateProductDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ description: 'Product description', example: 'High-performance laptop with 16GB RAM' })
+  @ApiProperty({
+    description: 'Product description',
+    example: 'High-performance laptop with 16GB RAM',
+  })
   @IsString()
   description: string;
 
@@ -18,22 +27,38 @@ export class CreateProductDto {
   @IsNumber()
   basePrice: number;
 
-  @ApiProperty({ description: 'Whether the product is active', example: true, required: false })
+  @ApiProperty({
+    description: 'Whether the product is active',
+    example: true,
+    required: false,
+  })
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
 
-  @ApiProperty({ description: 'Category UUID', example: '550e8400-e29b-41d4-a716-446655440000', required: false })
+  @ApiProperty({
+    description: 'Category UUID',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    required: false,
+  })
   @IsUUID()
   @IsOptional()
   categoryId?: string;
 
-  @ApiProperty({ description: 'Supplier UUID', example: '550e8400-e29b-41d4-a716-446655440001', required: false })
+  @ApiProperty({
+    description: 'Supplier UUID',
+    example: '550e8400-e29b-41d4-a716-446655440001',
+    required: false,
+  })
   @IsUUID()
   @IsOptional()
   supplierId?: string;
 
-  @ApiProperty({ description: 'Product image URL', example: 'https://example.com/image.jpg', required: false })
+  @ApiProperty({
+    description: 'Product image URL',
+    example: 'https://example.com/image.jpg',
+    required: false,
+  })
   @IsOptional()
   imageUrl?: string;
 }

@@ -7,8 +7,10 @@ import { Repository } from 'typeorm';
 
 @Injectable()
 export class AuthService {
-  constructor(@InjectRepository(Auth) private authRepository : Repository<Auth>) {}
-  async create(createAuthDto: CreateAuthDto) : Promise<Auth> {
+  constructor(
+    @InjectRepository(Auth) private authRepository: Repository<Auth>,
+  ) {}
+  async create(createAuthDto: CreateAuthDto): Promise<Auth> {
     const auth = this.authRepository.create(createAuthDto);
     await this.authRepository.save(auth);
     return auth;

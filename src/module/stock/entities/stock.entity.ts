@@ -11,11 +11,11 @@ import { User } from 'src/module/users/entities/user.entity';
 @Index('IDX_stock_movement_type', ['type'])
 @Index('IDX_stock_movement_created', ['createdAt'])
 export class StockMovement extends BaseEntity {
-  @ManyToOne(() => ProductVariant, variant => variant.stockMovements)
+  @ManyToOne(() => ProductVariant, (variant) => variant.stockMovements)
   @JoinColumn({ name: 'variantId' })
   variant: ProductVariant;
 
-  @ManyToOne(() => Branch, branch => branch.stockMovements)
+  @ManyToOne(() => Branch, (branch) => branch.stockMovements)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
@@ -37,7 +37,7 @@ export class StockMovement extends BaseEntity {
   @Column({ nullable: true })
   referenceId: string;
 
-  @ManyToOne(() => User, user => user.stockMovements)
+  @ManyToOne(() => User, (user) => user.stockMovements)
   @JoinColumn({ name: 'userId' })
   user: User;
 

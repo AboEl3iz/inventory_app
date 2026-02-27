@@ -13,7 +13,10 @@ import { Branch } from '../branches/entities/branch.entity';
 import { User } from '../users/entities/user.entity';
 
 const mockRepo = () => ({
-  find: jest.fn(), findOne: jest.fn(), create: jest.fn(), save: jest.fn(),
+  find: jest.fn(),
+  findOne: jest.fn(),
+  create: jest.fn(),
+  save: jest.fn(),
   createQueryBuilder: jest.fn(),
 });
 

@@ -10,7 +10,7 @@ export class EventsService {
   constructor(
     @InjectRepository(Event)
     private readonly eventRepo: Repository<Event>,
-  ) { }
+  ) {}
 
   async create(createEventDto: CreateEventDto) {
     const event = this.eventRepo.create({

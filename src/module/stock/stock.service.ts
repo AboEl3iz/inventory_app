@@ -10,7 +10,7 @@ export class StockService {
   constructor(
     @InjectRepository(StockMovement)
     private readonly movementRepo: Repository<StockMovement>,
-  ) { }
+  ) {}
 
   /**
    * Get all stock movements with optional filters

@@ -12,8 +12,11 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: {
-            create: jest.fn(), findAll: jest.fn(), findOne: jest.fn(),
-            update: jest.fn(), remove: jest.fn(),
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
           },
         },
       ],

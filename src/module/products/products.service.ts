@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -60,11 +66,14 @@ export class ProductsService {
     private readonly productImageRepo: Repository<ProductImage>,
     @Inject(STORAGE_PROVIDER)
     private readonly storageProvider: IStorageProvider,
-  ) { }
+  ) {}
 
   // ======================= BASIC CRUD =======================
 
-  async create(dto: CreateProductDto, user: IUserPayload): Promise<ProductResponse> {
+  async create(
+    dto: CreateProductDto,
+    user: IUserPayload,
+  ): Promise<ProductResponse> {
     const category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
     if (!category) throw new NotFoundException('Category not found');
 
@@ -151,7 +160,10 @@ export class ProductsService {
       user.role === Role.admin
         ? {}
         : { branch: { id: user.branchId }, isActive: true };
-    return this.productRepo.find({ where, select: ['id', 'name', 'basePrice'] });
+    return this.productRepo.find({
+      where,
+      select: ['id', 'name', 'basePrice'],
+    });
   }
 
   async stats(user: IUserPayload): Promise<ProductStatsResponse> {
@@ -170,15 +182,18 @@ export class ProductsService {
     return { total, active, inactive };
   }
 
-  async search(name: string, user: IUserPayload): Promise<ProductSearchResponse[]> {
+  async search(
+    name: string,
+    user: IUserPayload,
+  ): Promise<ProductSearchResponse[]> {
     const where =
       user.role === Role.admin
         ? { name: ILike(`%${name}%`) }
         : {
-          name: ILike(`%${name}%`),
-          branch: { id: user.branchId },
-          isActive: true,
-        };
+            name: ILike(`%${name}%`),
+            branch: { id: user.branchId },
+            isActive: true,
+          };
     const products = await this.productRepo.find({ where, take: 10 });
 
     return products.map((product) => ({
@@ -189,15 +204,21 @@ export class ProductsService {
     }));
   }
 
-  async findByCategory(categoryId: string, user: IUserPayload): Promise<ProductSearchResponse[]> {
+  async findByCategory(
+    categoryId: string,
+    user: IUserPayload,
+  ): Promise<ProductSearchResponse[]> {
     const where =
       user.role === Role.admin
         ? { category: { id: categoryId } }
         : {
-          category: { id: categoryId },
-          branch: { id: user.branchId },
-        };
-    const products = await this.productRepo.find({ where, relations: ['variants'] });
+            category: { id: categoryId },
+            branch: { id: user.branchId },
+          };
+    const products = await this.productRepo.find({
+      where,
+      relations: ['variants'],
+    });
 
     return products.map((product) => ({
       id: product.id,
@@ -247,7 +268,11 @@ export class ProductsService {
     };
   }
 
-  async update(id: string, dto: UpdateProductDto, user: IUserPayload): Promise<ProductResponse> {
+  async update(
+    id: string,
+    dto: UpdateProductDto,
+    user: IUserPayload,
+  ): Promise<ProductResponse> {
     const product = await this.productRepo.findOne({
       where: { id },
       relations: ['category', 'supplier'],
@@ -300,8 +325,13 @@ export class ProductsService {
 
   // ======================= VARIANTS =======================
 
-  async addVariants(productId: string, dtos: CreateVariantDto[]): Promise<AddVariantsResponse> {
-    const product = await this.productRepo.findOne({ where: { id: productId } });
+  async addVariants(
+    productId: string,
+    dtos: CreateVariantDto[],
+  ): Promise<AddVariantsResponse> {
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
     if (!product) throw new NotFoundException('Product not found');
 
     const variants = dtos.map((dto) =>
@@ -323,12 +353,18 @@ export class ProductsService {
   }
 
   async getVariants(productId: string): Promise<GetVariantsResponse[]> {
-    const product = await this.productRepo.findOne({ where: { id: productId } });
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
     if (!product) throw new NotFoundException('Product not found');
 
     const variants = await this.variantRepo.find({
       where: { product: { id: productId } },
-      relations: ['values', 'values.attributeValue', 'values.attributeValue.attribute'],
+      relations: [
+        'values',
+        'values.attributeValue',
+        'values.attributeValue.attribute',
+      ],
     });
 
     return variants.map((variant) => ({
@@ -347,7 +383,10 @@ export class ProductsService {
     }));
   }
 
-  async updateVariant(variantId: string, dto: UpdateVariantDto): Promise<VariantResponse> {
+  async updateVariant(
+    variantId: string,
+    dto: UpdateVariantDto,
+  ): Promise<VariantResponse> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product'],
@@ -380,7 +419,9 @@ export class ProductsService {
 
   // ======================= ATTRIBUTES =======================
 
-  async addAttribute(dto: CreateProductAttributeDto): Promise<AttributeResponse> {
+  async addAttribute(
+    dto: CreateProductAttributeDto,
+  ): Promise<AttributeResponse> {
     const category = await this.categoryRepo.findOneBy({ id: dto.categoryId });
     if (!category) throw new NotFoundException('Category not found');
 
@@ -399,11 +440,18 @@ export class ProductsService {
     };
   }
 
-  async addAttributeValue(productId: string, dto: CreateProductAttributeValueDto): Promise<AttributeValueResponse> {
-    const product = await this.productRepo.findOne({ where: { id: productId } });
+  async addAttributeValue(
+    productId: string,
+    dto: CreateProductAttributeValueDto,
+  ): Promise<AttributeValueResponse> {
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
     if (!product) throw new NotFoundException('Product not found');
 
-    const attribute = await this.attributeRepo.findOneBy({ id: dto.attributeId });
+    const attribute = await this.attributeRepo.findOneBy({
+      id: dto.attributeId,
+    });
     if (!attribute) throw new NotFoundException('Attribute not found');
 
     const value = this.attributeValueRepo.create({
@@ -424,7 +472,9 @@ export class ProductsService {
   }
 
   async getAttributes(productId: string): Promise<GetAttributesResponse[]> {
-    const product = await this.productRepo.findOne({ where: { id: productId } });
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
     if (!product) throw new NotFoundException('Product not found');
 
     const attributes = await this.attributeValueRepo.find({
@@ -442,7 +492,9 @@ export class ProductsService {
     }));
   }
 
-  async getAttributesByCategory(categoryId: string): Promise<GetAttributesByCategoryResponse[]> {
+  async getAttributesByCategory(
+    categoryId: string,
+  ): Promise<GetAttributesByCategoryResponse[]> {
     const attributes = await this.attributeRepo.find({
       where: { category: { id: categoryId } },
       relations: ['values'],
@@ -461,7 +513,10 @@ export class ProductsService {
 
   // ======================= VARIANT VALUES =======================
 
-  async linkVariantValues(variantId: string, valueIds: string[]): Promise<LinkVariantValuesResponse> {
+  async linkVariantValues(
+    variantId: string,
+    valueIds: string[],
+  ): Promise<LinkVariantValuesResponse> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product', 'values'],
@@ -493,7 +548,9 @@ export class ProductsService {
     };
   }
 
-  async getVariantValues(variantId: string): Promise<GetVariantValuesResponse[]> {
+  async getVariantValues(
+    variantId: string,
+  ): Promise<GetVariantValuesResponse[]> {
     const variant = await this.variantRepo.findOne({
       where: { id: variantId },
       relations: ['product'],
@@ -518,12 +575,21 @@ export class ProductsService {
     }));
   }
 
-  async uploadProductImages(productId: string, filePaths: string[], user: IUserPayload): Promise<UploadImagesResponse> {
-    const product = await this.productRepo.findOne({ where: { id: productId } });
+  async uploadProductImages(
+    productId: string,
+    filePaths: string[],
+    user: IUserPayload,
+  ): Promise<UploadImagesResponse> {
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
     if (!product) throw new NotFoundException('Product not found');
 
     // Use the storage provider abstraction instead of direct Cloudinary calls
-    const uploadResults = await this.storageProvider.uploadMultipleImages(filePaths, 'products');
+    const uploadResults = await this.storageProvider.uploadMultipleImages(
+      filePaths,
+      'products',
+    );
 
     const images = uploadResults.map((result) =>
       this.productImageRepo.create({

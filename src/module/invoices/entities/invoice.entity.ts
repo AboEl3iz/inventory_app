@@ -1,4 +1,11 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  Index,
+} from 'typeorm';
 import { BaseEntity } from '../../../entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { Branch } from '../../branches/entities/branch.entity';
@@ -13,7 +20,7 @@ export class Invoice extends BaseEntity {
   @Column({ unique: true })
   invoiceNumber: string;
 
-  @ManyToOne(() => User, user => user.invoices)
+  @ManyToOne(() => User, (user) => user.invoices)
   @JoinColumn({ name: 'userId' })
   user: User;
 
@@ -23,7 +30,7 @@ export class Invoice extends BaseEntity {
   @Column({ nullable: true })
   CustomerName: string;
 
-  @ManyToOne(() => Branch, branch => branch.invoices)
+  @ManyToOne(() => Branch, (branch) => branch.invoices)
   @JoinColumn({ name: 'branchId' })
   branch: Branch;
 
@@ -51,8 +58,6 @@ export class Invoice extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
-  @OneToMany(() => InvoiceItem, item => item.invoice, { cascade: true })
+  @OneToMany(() => InvoiceItem, (item) => item.invoice, { cascade: true })
   items: InvoiceItem[];
 }
-
-

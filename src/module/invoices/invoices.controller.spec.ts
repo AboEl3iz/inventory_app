@@ -14,8 +14,11 @@ describe('InvoicesController', () => {
         {
           provide: InvoicesService,
           useValue: {
-            createInvoice: jest.fn(), getAll: jest.fn(), getOne: jest.fn(),
-            cancelInvoice: jest.fn(), getBranchStats: jest.fn(),
+            createInvoice: jest.fn(),
+            getAll: jest.fn(),
+            getOne: jest.fn(),
+            cancelInvoice: jest.fn(),
+            getBranchStats: jest.fn(),
           },
         },
       ],

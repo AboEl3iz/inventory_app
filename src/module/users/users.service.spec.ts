@@ -8,8 +8,12 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Auth } from '../auth/entities/auth.entity';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { compare } from 'bcrypt';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const mockUser = {
@@ -120,7 +124,9 @@ describe('UsersService', () => {
         refreshtoken: 'refresh-token-uuid',
       });
 
-      expect(mockUserRepo.findOne).toHaveBeenCalledWith({ where: { email: 'karim@test.com' } });
+      expect(mockUserRepo.findOne).toHaveBeenCalledWith({
+        where: { email: 'karim@test.com' },
+      });
       expect(mockUserRepo.create).toHaveReturnedWith(mockUser);
       expect(mockAuthService.create).toHaveBeenCalled();
       expect(mockJwtService.sign).toHaveBeenCalled();
@@ -129,7 +135,11 @@ describe('UsersService', () => {
     it('should throw error if email exists', async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
       await expect(
-        service.create({ name: 'Karim', email: 'karim@test.com', password: '123456' }),
+        service.create({
+          name: 'Karim',
+          email: 'karim@test.com',
+          password: '123456',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -141,7 +151,10 @@ describe('UsersService', () => {
       mockJwtService.sign.mockReturnValue('jwt-token');
       mockAuthRepo.findOne.mockResolvedValue(null);
       mockAuthService.create.mockResolvedValue(mockAuth);
-      const result = await service.login({ email: 'karim@test.com', password: '123456' });
+      const result = await service.login({
+        email: 'karim@test.com',
+        password: '123456',
+      });
 
       expect(result).toEqual({
         id: mockUser.id,
@@ -159,7 +172,7 @@ describe('UsersService', () => {
         where: { email: 'karim@test.com' },
         relations: ['purchases', 'invoices', 'branch'],
       });
-      expect(require('bcrypt').compare).toHaveBeenCalledWith('123456', 'hashed_pass');
+      expect(bcrypt.compare).toHaveBeenCalledWith('123456', 'hashed_pass');
       expect(mockJwtService.sign).toHaveBeenCalledTimes(1);
     });
 
@@ -172,7 +185,9 @@ describe('UsersService', () => {
 
     it('should throw error for invalid password', async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
-      jest.spyOn(require('bcrypt'), 'compare').mockResolvedValueOnce(false);
+      jest
+        .spyOn(bcrypt, 'compare')
+        .mockImplementation(jest.fn().mockResolvedValueOnce(false) as any);
       await expect(
         service.login({ email: 'karim@test.com', password: 'wrongpass' }),
       ).rejects.toThrow(BadRequestException);
@@ -231,12 +246,19 @@ describe('UsersService', () => {
 
     it('should throw error for invalid refresh token', async () => {
       mockAuthRepo.findOne.mockResolvedValue(null);
-      await expect(service.refreshtoken('invalid-token')).rejects.toThrow(BadRequestException);
+      await expect(service.refreshtoken('invalid-token')).rejects.toThrow(
+        BadRequestException,
+      );
     });
     it('should throw error for expired refresh token', async () => {
-      mockAuthRepo.findOne.mockResolvedValue({ ...mockAuth, expiresAt: new Date(Date.now() - 1000) });
+      mockAuthRepo.findOne.mockResolvedValue({
+        ...mockAuth,
+        expiresAt: new Date(Date.now() - 1000),
+      });
       mockAuthRepo.remove.mockResolvedValue(undefined);
-      await expect(service.refreshtoken('expired-token')).rejects.toThrow(BadRequestException);
+      await expect(service.refreshtoken('expired-token')).rejects.toThrow(
+        BadRequestException,
+      );
       expect(mockAuthRepo.remove).toHaveBeenCalled();
     });
   });
@@ -252,7 +274,9 @@ describe('UsersService', () => {
 
     it('should throw error if user not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      await expect(service.updateRole('1', { role: 'admin' })).rejects.toThrow(NotFoundException);
+      await expect(service.updateRole('1', { role: 'admin' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -261,7 +285,11 @@ describe('UsersService', () => {
       const userId = 'user_1';
       const updateUserDto = { name: 'New Name', password: 'newpass123' };
       mockUserRepo.findOne.mockResolvedValue({ ...mockUser, id: userId });
-      mockUserRepo.save.mockResolvedValue({ ...mockUser, id: userId, name: 'New Name' });
+      mockUserRepo.save.mockResolvedValue({
+        ...mockUser,
+        id: userId,
+        name: 'New Name',
+      });
 
       const result = await service.updateProfile(userId, updateUserDto);
 
@@ -272,12 +300,16 @@ describe('UsersService', () => {
 
     it('should throw NotFoundException if user not found', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
-      await expect(service.updateProfile('user_1', { name: 'Name' })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.updateProfile('user_1', { name: 'Name' }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if trying to change role', async () => {
       mockUserRepo.findOne.mockResolvedValue({ id: 'user-1' } as any);
-      await expect(service.updateProfile('user-1', { role: 'admin' })).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.updateProfile('user-1', { role: 'admin' }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

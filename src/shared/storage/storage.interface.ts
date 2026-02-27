@@ -8,30 +8,33 @@
  *   3. The StorageFactory will automatically resolve the right provider
  */
 export interface IStorageProvider {
-    uploadImage(filePath: string, folder: string): Promise<StorageUploadResult>;
-    deleteFile(publicId: string): Promise<StorageDeleteResult>;
-    uploadMultipleImages(filePaths: string[], folder: string): Promise<StorageUploadResult[]>;
-    deleteMultipleFiles(publicIds: string[]): Promise<StorageDeleteResult[]>;
-    uploadVideo(filePath: string, folder: string): Promise<StorageUploadResult>;
-    deleteVideo(publicId: string): Promise<StorageDeleteResult>;
-    uploadPdf(filePath: string, folder: string): Promise<StorageUploadResult>;
-    deletePdf(publicId: string): Promise<StorageDeleteResult>;
+  uploadImage(filePath: string, folder: string): Promise<StorageUploadResult>;
+  deleteFile(publicId: string): Promise<StorageDeleteResult>;
+  uploadMultipleImages(
+    filePaths: string[],
+    folder: string,
+  ): Promise<StorageUploadResult[]>;
+  deleteMultipleFiles(publicIds: string[]): Promise<StorageDeleteResult[]>;
+  uploadVideo(filePath: string, folder: string): Promise<StorageUploadResult>;
+  deleteVideo(publicId: string): Promise<StorageDeleteResult>;
+  uploadPdf(filePath: string, folder: string): Promise<StorageUploadResult>;
+  deletePdf(publicId: string): Promise<StorageDeleteResult>;
 }
 
 export interface StorageUploadResult {
-    publicId: string;
-    url: string;
-    secureUrl: string;
-    format: string;
-    bytes: number;
-    width?: number;
-    height?: number;
-    resourceType: string;
-    originalFilename?: string;
+  publicId: string;
+  url: string;
+  secureUrl: string;
+  format: string;
+  bytes: number;
+  width?: number;
+  height?: number;
+  resourceType: string;
+  originalFilename?: string;
 }
 
 export interface StorageDeleteResult {
-    result: string;
+  result: string;
 }
 
 export const STORAGE_PROVIDER = 'STORAGE_PROVIDER';

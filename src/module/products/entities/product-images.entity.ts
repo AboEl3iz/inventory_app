@@ -1,10 +1,10 @@
-import { Entity,  ManyToOne, JoinColumn, Column } from "typeorm";
-import { Product } from "./product.entity";
-import { BaseEntity } from "src/entities/base.entity";
+import { Entity, ManyToOne, JoinColumn, Column } from 'typeorm';
+import { Product } from './product.entity';
+import { BaseEntity } from 'src/entities/base.entity';
 
 @Entity('product_images')
 export class ProductImage extends BaseEntity {
-  @ManyToOne(() => Product, product => product.images, {
+  @ManyToOne(() => Product, (product) => product.images, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'productId' })

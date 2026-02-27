@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -32,16 +38,22 @@ export class UsersService {
     private readonly authService: AuthService,
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: WinstonLogger,
-  ) { }
+  ) {}
 
   async create(createUserDto: CreateUserDto): Promise<IregisterResponse> {
-    const existingUser = await this.usersRepository.findOne({ where: { email: createUserDto.email } });
+    const existingUser = await this.usersRepository.findOne({
+      where: { email: createUserDto.email },
+    });
     if (existingUser) {
       throw new BadRequestException('Email already exists');
     }
 
-    const saltRounds = this.configService.get<number>('BCRYPT_SALT_ROUNDS') || 10;
-    const hashedPassword = await encryptPassword(createUserDto.password, saltRounds);
+    const saltRounds =
+      this.configService.get<number>('BCRYPT_SALT_ROUNDS') || 10;
+    const hashedPassword = await encryptPassword(
+      createUserDto.password,
+      saltRounds,
+    );
 
     const user = this.usersRepository.create({
       ...createUserDto,
@@ -79,7 +91,10 @@ export class UsersService {
       throw new BadRequestException('Invalid email or password');
     }
 
-    const isPasswordValid = await comparePassword(loginUserDto.password, user.password);
+    const isPasswordValid = await comparePassword(
+      loginUserDto.password,
+      user.password,
+    );
     if (!isPasswordValid) {
       throw new BadRequestException('Invalid email or password');
     }
@@ -89,7 +104,9 @@ export class UsersService {
     const refreshtoken = this.generateRefreshToken();
 
     // Remove old refresh token if it exists
-    const oldRefreshToken = await this.authRepository.findOne({ where: { user: { id: user.id } } });
+    const oldRefreshToken = await this.authRepository.findOne({
+      where: { user: { id: user.id } },
+    });
     if (oldRefreshToken) {
       await this.authRepository.remove(oldRefreshToken);
     }
@@ -165,7 +182,10 @@ export class UsersService {
     return 'User role updated successfully';
   }
 
-  async updateProfile(id: string, updateUserDto: UpdateUserDto): Promise<string> {
+  async updateProfile(
+    id: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<string> {
     const user = await this.usersRepository.findOne({ where: { id } });
     if (!user) {
       this.logger.warn(`User with id ${id} not found`);
@@ -178,8 +198,12 @@ export class UsersService {
     }
 
     if (updateUserDto.password) {
-      const saltRounds = this.configService.get<number>('BCRYPT_SALT_ROUNDS') || 10;
-      updateUserDto.password = await encryptPassword(updateUserDto.password, saltRounds);
+      const saltRounds =
+        this.configService.get<number>('BCRYPT_SALT_ROUNDS') || 10;
+      updateUserDto.password = await encryptPassword(
+        updateUserDto.password,
+        saltRounds,
+      );
     }
 
     Object.assign(user, updateUserDto);

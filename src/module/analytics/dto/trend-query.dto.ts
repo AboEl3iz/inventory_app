@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsDateString, IsUUID } from "class-validator";
+import { IsOptional, IsEnum, IsDateString, IsUUID } from 'class-validator';
 
 export class TrendQueryDto {
   @IsOptional()

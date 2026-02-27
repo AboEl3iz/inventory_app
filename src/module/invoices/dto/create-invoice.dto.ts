@@ -1,10 +1,26 @@
-import { Type } from "class-transformer";
-import { IsUUID, IsInt, Min, IsNumber, IsString, IsArray, ArrayMinSize, Validate, IsEnum, IsNotEmpty, IsOptional, ValidateNested } from "class-validator";
-import { In } from "typeorm";
+import { Type } from 'class-transformer';
+import {
+  IsUUID,
+  IsInt,
+  Min,
+  IsNumber,
+  IsString,
+  IsArray,
+  ArrayMinSize,
+  Validate,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
+import { In } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class InvoiceItemDto {
-  @ApiProperty({ description: 'Product variant UUID', example: '550e8400-e29b-41d4-a716-446655440000' })
+  @ApiProperty({
+    description: 'Product variant UUID',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @IsNotEmpty()
   variantId: string;
 
@@ -18,7 +34,12 @@ export class InvoiceItemDto {
   @Min(0)
   unitPrice: number;
 
-  @ApiProperty({ description: 'Item discount', example: 10.00, minimum: 0, required: false })
+  @ApiProperty({
+    description: 'Item discount',
+    example: 10.0,
+    minimum: 0,
+    required: false,
+  })
   @IsNumber()
   @Min(0)
   @IsOptional()
@@ -26,19 +47,35 @@ export class InvoiceItemDto {
 }
 
 export class CreateInvoiceDto {
-  @ApiProperty({ description: 'Branch UUID', example: '550e8400-e29b-41d4-a716-446655440001', required: false })
+  @ApiProperty({
+    description: 'Branch UUID',
+    example: '550e8400-e29b-41d4-a716-446655440001',
+    required: false,
+  })
   @IsOptional()
   branchId: string;
 
-  @ApiProperty({ description: 'Customer email', example: 'customer@example.com', required: false })
+  @ApiProperty({
+    description: 'Customer email',
+    example: 'customer@example.com',
+    required: false,
+  })
   @IsOptional()
   CustomerEmail: string;
 
-  @ApiProperty({ description: 'Customer name', example: 'John Doe', required: false })
+  @ApiProperty({
+    description: 'Customer name',
+    example: 'John Doe',
+    required: false,
+  })
   @IsOptional()
   CustomerName: string;
 
-  @ApiProperty({ description: 'User UUID', example: '550e8400-e29b-41d4-a716-446655440002', required: false })
+  @ApiProperty({
+    description: 'User UUID',
+    example: '550e8400-e29b-41d4-a716-446655440002',
+    required: false,
+  })
   @IsOptional()
   userId: string;
 
@@ -49,24 +86,42 @@ export class CreateInvoiceDto {
   @Type(() => InvoiceItemDto)
   items: InvoiceItemDto[];
 
-  @ApiProperty({ description: 'Invoice discount', example: 50.00, minimum: 0, required: false })
+  @ApiProperty({
+    description: 'Invoice discount',
+    example: 50.0,
+    minimum: 0,
+    required: false,
+  })
   @IsNumber()
   @Min(0)
   @IsOptional()
   discount?: number;
 
-  @ApiProperty({ description: 'Invoice tax', example: 25.00, minimum: 0, required: false })
+  @ApiProperty({
+    description: 'Invoice tax',
+    example: 25.0,
+    minimum: 0,
+    required: false,
+  })
   @IsNumber()
   @Min(0)
   @IsOptional()
   tax?: number;
 
-  @ApiProperty({ description: 'Invoice status', enum: ['pending', 'paid', 'cancelled', 'refunded'], required: false })
+  @ApiProperty({
+    description: 'Invoice status',
+    enum: ['pending', 'paid', 'cancelled', 'refunded'],
+    required: false,
+  })
   @IsEnum(['pending', 'paid', 'cancelled', 'refunded'])
   @IsOptional()
   status?: 'pending' | 'paid' | 'cancelled' | 'refunded';
 
-  @ApiProperty({ description: 'Payment method', enum: ['cash', 'card', 'bank_transfer', 'credit'], required: false })
+  @ApiProperty({
+    description: 'Payment method',
+    enum: ['cash', 'card', 'bank_transfer', 'credit'],
+    required: false,
+  })
   @IsEnum(['cash', 'card', 'bank_transfer', 'credit'])
   @IsOptional()
   paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'credit';

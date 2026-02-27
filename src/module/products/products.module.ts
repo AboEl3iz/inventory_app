@@ -19,7 +19,17 @@ import { ProductImage } from './entities/product-images.entity';
     CacheModule.register({
       ttl: 60 * 5, // cache duration: 5 minutes
     }),
-    TypeOrmModule.forFeature([Product ,Supplier, ProductVariantValue ,ProductAttributeValue,ProductAttribute,ProductVariant,Category,Supplier , ProductImage]),
+    TypeOrmModule.forFeature([
+      Product,
+      Supplier,
+      ProductVariantValue,
+      ProductAttributeValue,
+      ProductAttribute,
+      ProductVariant,
+      Category,
+      Supplier,
+      ProductImage,
+    ]),
   ],
 })
-export class ProductsModule { }
+export class ProductsModule {}

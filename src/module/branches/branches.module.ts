@@ -13,7 +13,14 @@ import { Invoice } from '../invoices/entities/invoice.entity';
   controllers: [BranchesController],
   providers: [BranchesService],
   imports: [
-    TypeOrmModule.forFeature([Branch , ProductVariant, Product, Inventory , User , Invoice])
-  ]
+    TypeOrmModule.forFeature([
+      Branch,
+      ProductVariant,
+      Product,
+      Inventory,
+      User,
+      Invoice,
+    ]),
+  ],
 })
 export class BranchesModule {}

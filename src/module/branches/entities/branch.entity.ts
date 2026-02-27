@@ -1,5 +1,6 @@
 import { Entity, Column, OneToMany } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Inventory } from '../../inventory/entities/inventory.entity';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Inventory } from '../../inventory/entities/inventory.entity';
 import { User } from '../../users/entities/user.entity';
 import { Invoice } from 'src/module/invoices/entities/invoice.entity';
 import { Purchase } from 'src/module/purchases/entities/purchase.entity';
@@ -19,19 +20,18 @@ export class Branch extends BaseEntity {
   @Column({ default: true })
   isActive: boolean;
 
-  @OneToMany(() => User, user => user.branch)
+  @OneToMany(() => User, (user) => user.branch)
   users: User[];
 
-  @OneToMany(() => Inventory, inventory => inventory.branch)
+  @OneToMany(() => Inventory, (inventory) => inventory.branch)
   inventories: Inventory[];
 
-  @OneToMany(() => Invoice, invoice => invoice.branch)
+  @OneToMany(() => Invoice, (invoice) => invoice.branch)
   invoices: Invoice[];
 
-  @OneToMany(() => Purchase, purchase => purchase.branch)
+  @OneToMany(() => Purchase, (purchase) => purchase.branch)
   purchases: Purchase[];
 
-  @OneToMany(() => StockMovement, movement => movement.branch)
+  @OneToMany(() => StockMovement, (movement) => movement.branch)
   stockMovements: StockMovement[];
 }
-

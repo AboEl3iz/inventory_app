@@ -14,8 +14,12 @@ describe('InventoryController', () => {
         {
           provide: InventoryService,
           useValue: {
-            create: jest.fn(), findAll: jest.fn(), findOne: jest.fn(),
-            update: jest.fn(), adjustStock: jest.fn(), transferStock: jest.fn(),
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            adjustStock: jest.fn(),
+            transferStock: jest.fn(),
             getLowStock: jest.fn(),
           },
         },

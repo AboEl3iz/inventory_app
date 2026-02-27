@@ -1,7 +1,18 @@
 import {
-  Controller, Get, Post, Body, Patch, Param, Delete,
-  Query, Req, UseGuards, UseInterceptors, UploadedFiles,
-  BadRequestException, ParseUUIDPipe,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  Req,
+  UseGuards,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -17,8 +28,14 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
-  ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse,
-  ApiBearerAuth, ApiConsumes, ApiBody,
+  ApiTags,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 
 @Controller('products')
@@ -26,23 +43,33 @@ import {
 @ApiBearerAuth('access-token')
 @UseGuards(AuthenticationGuard, AuthorizationGuard)
 export class ProductsController {
-  constructor(private readonly productService: ProductsService) { }
+  constructor(private readonly productService: ProductsService) {}
 
   // ─── BASIC CRUD ───
 
   @Roles(Role.admin, Role.manager)
   @Post()
-  @ApiOperation({ summary: 'Create a new product', description: 'Create a new product. Only admin and manager can perform this action.' })
+  @ApiOperation({
+    summary: 'Create a new product',
+    description:
+      'Create a new product. Only admin and manager can perform this action.',
+  })
   @ApiResponse({ status: 201, description: 'Product created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid product data' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Insufficient permissions' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Insufficient permissions',
+  })
   create(@Body() dto: CreateProductDto, @Req() req) {
     return this.productService.create(dto, req.user);
   }
 
   @Roles(Role.admin, Role.manager)
   @Post(':productId/images')
-  @ApiOperation({ summary: 'Upload product images', description: 'Upload up to 5 product images' })
+  @ApiOperation({
+    summary: 'Upload product images',
+    description: 'Upload up to 5 product images',
+  })
   @ApiParam({ name: 'productId', description: 'Product ID (UUID)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -52,7 +79,8 @@ export class ProductsController {
         images: {
           type: 'array',
           items: { type: 'string', format: 'binary' },
-          description: 'Product images (JPEG, PNG, JPG, WEBP — max 5 files, 5MB each)',
+          description:
+            'Product images (JPEG, PNG, JPG, WEBP — max 5 files, 5MB each)',
         },
       },
     },
@@ -64,14 +92,23 @@ export class ProductsController {
       storage: diskStorage({
         destination: 'uploads/products',
         filename: (_req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(
+            null,
+            `${file.fieldname}-${uniqueSuffix}${extname(file.originalname)}`,
+          );
         },
       }),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.match(/^image\/(jpeg|png|jpg|webp)$/)) {
-          return cb(new BadRequestException('Only image files (jpeg, jpg, png, webp) are allowed!'), false);
+          return cb(
+            new BadRequestException(
+              'Only image files (jpeg, jpg, png, webp) are allowed!',
+            ),
+            false,
+          );
         }
         cb(null, true);
       },
@@ -93,11 +130,34 @@ export class ProductsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all products', description: 'Retrieve all products with optional pagination and filtering' })
-  @ApiQuery({ name: 'page', type: 'number', required: false, description: 'Page number (starts from 1)' })
-  @ApiQuery({ name: 'limit', type: 'number', required: false, description: 'Number of items per page' })
-  @ApiQuery({ name: 'search', type: 'string', required: false, description: 'Search by product name' })
-  @ApiQuery({ name: 'categoryId', type: 'string', required: false, description: 'Filter by category UUID' })
+  @ApiOperation({
+    summary: 'Get all products',
+    description: 'Retrieve all products with optional pagination and filtering',
+  })
+  @ApiQuery({
+    name: 'page',
+    type: 'number',
+    required: false,
+    description: 'Page number (starts from 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    type: 'number',
+    required: false,
+    description: 'Number of items per page',
+  })
+  @ApiQuery({
+    name: 'search',
+    type: 'string',
+    required: false,
+    description: 'Search by product name',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    type: 'string',
+    required: false,
+    description: 'Filter by category UUID',
+  })
   @ApiResponse({ status: 200, description: 'Products retrieved successfully' })
   findAll(
     @Query('page') page?: number,
@@ -106,11 +166,20 @@ export class ProductsController {
     @Query('categoryId') categoryId?: string,
     @Req() req?,
   ) {
-    return this.productService.findAll(page, limit, search, categoryId, req.user);
+    return this.productService.findAll(
+      page,
+      limit,
+      search,
+      categoryId,
+      req.user,
+    );
   }
 
   @Get('flat')
-  @ApiOperation({ summary: 'Get flat products list', description: 'Simplified list without pagination' })
+  @ApiOperation({
+    summary: 'Get flat products list',
+    description: 'Simplified list without pagination',
+  })
   @ApiResponse({ status: 200, description: 'Flat list retrieved successfully' })
   flatList(@Req() req) {
     return this.productService.flatList(req.user);
@@ -119,24 +188,40 @@ export class ProductsController {
   @Roles(Role.admin, Role.manager)
   @Get('stats')
   @ApiOperation({ summary: 'Get products statistics' })
-  @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Statistics retrieved successfully',
+  })
   stats(@Req() req) {
     return this.productService.stats(req.user);
   }
 
   @Get('search')
-  @ApiOperation({ summary: 'Search products', description: 'Search products by name' })
+  @ApiOperation({
+    summary: 'Search products',
+    description: 'Search products by name',
+  })
   @ApiQuery({ name: 'name', type: 'string', required: true })
-  @ApiResponse({ status: 200, description: 'Search results retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Search results retrieved successfully',
+  })
   search(@Query('name') name: string, @Req() req) {
     return this.productService.search(name, req.user);
   }
 
   @Get('category/:categoryId')
   @ApiOperation({ summary: 'Get products by category' })
-  @ApiParam({ name: 'categoryId', type: 'string', description: 'Category UUID' })
+  @ApiParam({
+    name: 'categoryId',
+    type: 'string',
+    description: 'Category UUID',
+  })
   @ApiResponse({ status: 200, description: 'Products retrieved successfully' })
-  findByCategory(@Param('categoryId', ParseUUIDPipe) categoryId: string, @Req() req) {
+  findByCategory(
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
+    @Req() req,
+  ) {
     return this.productService.findByCategory(categoryId, req.user);
   }
 
@@ -155,7 +240,11 @@ export class ProductsController {
   @ApiParam({ name: 'id', type: 'string', description: 'Product UUID' })
   @ApiResponse({ status: 200, description: 'Product updated successfully' })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateProductDto, @Req() req) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProductDto,
+    @Req() req,
+  ) {
     return this.productService.update(id, dto, req.user);
   }
 
@@ -230,7 +319,10 @@ export class ProductsController {
   @Post(':id/attributes')
   @ApiOperation({ summary: 'Add product attribute value' })
   @ApiParam({ name: 'id', type: 'string', description: 'Product UUID' })
-  @ApiResponse({ status: 201, description: 'Attribute value added successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Attribute value added successfully',
+  })
   addAttributeValue(
     @Param('id', ParseUUIDPipe) productId: string,
     @Body() dto: CreateProductAttributeValueDto,
@@ -241,7 +333,10 @@ export class ProductsController {
   @Get(':id/attributes')
   @ApiOperation({ summary: 'Get product attributes' })
   @ApiParam({ name: 'id', type: 'string', description: 'Product UUID' })
-  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Attributes retrieved successfully',
+  })
   getAttributes(@Param('id', ParseUUIDPipe) productId: string) {
     return this.productService.getAttributes(productId);
   }
@@ -256,8 +351,15 @@ export class ProductsController {
 
   @Get('attributes/:categoryId')
   @ApiOperation({ summary: 'Get category attributes' })
-  @ApiParam({ name: 'categoryId', type: 'string', description: 'Category UUID' })
-  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
+  @ApiParam({
+    name: 'categoryId',
+    type: 'string',
+    description: 'Category UUID',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Attributes retrieved successfully',
+  })
   getAllAttributes(@Param('categoryId', ParseUUIDPipe) categoryId: string) {
     return this.productService.getAttributesByCategory(categoryId);
   }
@@ -268,7 +370,10 @@ export class ProductsController {
   @Post('variants/:variantId/values')
   @ApiOperation({ summary: 'Link attribute values to variant' })
   @ApiParam({ name: 'variantId', type: 'string', description: 'Variant UUID' })
-  @ApiResponse({ status: 200, description: 'Attribute values linked successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Attribute values linked successfully',
+  })
   linkVariantValues(
     @Param('variantId', ParseUUIDPipe) variantId: string,
     @Body() body: { valueIds: string[] },
@@ -279,7 +384,10 @@ export class ProductsController {
   @Get('variants/:variantId/values')
   @ApiOperation({ summary: 'Get variant attribute values' })
   @ApiParam({ name: 'variantId', type: 'string', description: 'Variant UUID' })
-  @ApiResponse({ status: 200, description: 'Attribute values retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Attribute values retrieved successfully',
+  })
   getVariantValues(@Param('variantId', ParseUUIDPipe) variantId: string) {
     return this.productService.getVariantValues(variantId);
   }

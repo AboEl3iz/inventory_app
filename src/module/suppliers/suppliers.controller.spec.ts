@@ -14,8 +14,12 @@ describe('SuppliersController', () => {
         {
           provide: SuppliersService,
           useValue: {
-            create: jest.fn(), findAll: jest.fn(), findOne: jest.fn(),
-            update: jest.fn(), remove: jest.fn(), getRefillRecommendations: jest.fn(),
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+            getRefillRecommendations: jest.fn(),
           },
         },
       ],

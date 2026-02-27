@@ -1,12 +1,18 @@
-import { UploadApiResponse } from "cloudinary";
-import cloudinary from "src/config/cloudinary.config";
+import { UploadApiResponse } from 'cloudinary';
+import cloudinary from 'src/config/cloudinary.config';
 import fs from 'fs';
 
-export const uploadImageToCloudinary = async (filePath: string, folder: string) => {
+export const uploadImageToCloudinary = async (
+  filePath: string,
+  folder: string,
+) => {
   try {
-    const result: UploadApiResponse = await cloudinary.uploader.upload(filePath, {
-      folder,
-    });
+    const result: UploadApiResponse = await cloudinary.uploader.upload(
+      filePath,
+      {
+        folder,
+      },
+    );
     return result;
   } catch (error) {
     throw new Error('Cloudinary upload failed');
@@ -22,8 +28,6 @@ export const deleteFromCloudinary = async (publicId: string) => {
   }
 };
 
-
-
 export const uploadMultipleImagesToCloudinary = async (
   filePaths: string[],
   folder: string,
@@ -31,7 +35,7 @@ export const uploadMultipleImagesToCloudinary = async (
   try {
     const uploadPromises = filePaths.map(async (filePath) => {
       const result = await cloudinary.uploader.upload(filePath, { folder });
-      
+
       fs.unlink(filePath, (err) => {
         if (err) console.error(`Failed to delete local file ${filePath}:`, err);
       });
@@ -47,7 +51,6 @@ export const uploadMultipleImagesToCloudinary = async (
   }
 };
 
-
 export const deleteMultipleFromCloudinary = async (publicIds: string[]) => {
   try {
     const deletePromises = publicIds.map((publicId) => {
@@ -60,49 +63,61 @@ export const deleteMultipleFromCloudinary = async (publicIds: string[]) => {
   }
 };
 
-
-export const uploadvideoToCloudinary = async (filePath: string, folder: string) => {
+export const uploadvideoToCloudinary = async (
+  filePath: string,
+  folder: string,
+) => {
   try {
-    const result: UploadApiResponse = await cloudinary.uploader.upload(filePath, {
-      folder,
-      resource_type: "video",
-      chunk_size: 60000
-    },
-
+    const result: UploadApiResponse = await cloudinary.uploader.upload(
+      filePath,
+      {
+        folder,
+        resource_type: 'video',
+        chunk_size: 60000,
+      },
     );
     return result;
   } catch (error) {
     throw new Error('Cloudinary upload failed');
   }
-}
+};
 
 export const deletevideoFromCloudinary = async (publicId: string) => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId, { resource_type: "video" });
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: 'video',
+    });
     return result;
   } catch (error) {
     throw new Error('Cloudinary deletion failed');
   }
 };
 
-export const uploadpdfToCloudinary = async (filePath: string, folder: string) => {
+export const uploadpdfToCloudinary = async (
+  filePath: string,
+  folder: string,
+) => {
   try {
-    const result: UploadApiResponse = await cloudinary.uploader.upload(filePath, {
-      folder,
-      resource_type: "raw",
-    });
+    const result: UploadApiResponse = await cloudinary.uploader.upload(
+      filePath,
+      {
+        folder,
+        resource_type: 'raw',
+      },
+    );
     return result;
   } catch (error) {
     throw new Error('Cloudinary upload failed');
   }
-}
+};
 
 export const deletepdfFromCloudinary = async (publicId: string) => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: 'raw',
+    });
     return result;
   } catch (error) {
     throw new Error('Cloudinary deletion failed');
   }
 };
-

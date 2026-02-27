@@ -53,7 +53,7 @@ async function bootstrap() {
     .setTitle('Inventory Management System API')
     .setDescription(
       'Complete API documentation for Inventory Management System — ' +
-      'Manage products, inventory, suppliers, users, invoices, and more',
+        'Manage products, inventory, suppliers, users, invoices, and more',
     )
     .setVersion('1.0.0')
     .addBearerAuth(
@@ -81,7 +81,8 @@ async function bootstrap() {
     .addTag('Analytics', 'Business analytics and insights')
     .build();
 
-  const documentFactory = () => SwaggerModule.createDocument(app, swaggerConfig);
+  const documentFactory = () =>
+    SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, documentFactory);
 
   // ─── Start ───

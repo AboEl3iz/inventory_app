@@ -1,11 +1,6 @@
-import {
-  Entity,
-  Column,
-  ManyToOne,
-  OneToMany,
-  JoinColumn,
-} from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Category } from '../../categories/entities/category.entity';
+import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Category } from '../../categories/entities/category.entity';
 import { Supplier } from '../../suppliers/entities/supplier.entity';
 import { ProductVariant } from './product-variant.entity';
 import { ProductAttributeValue } from './product-attribute-value.entity';
@@ -28,26 +23,26 @@ export class Product extends BaseEntity {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
-  
-
-  @ManyToOne(() => Category, category => category.products, {
+  @ManyToOne(() => Category, (category) => category.products, {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'categoryId' })
   category: Category;
 
-  @ManyToOne(() => Supplier, supplier => supplier.products, {
+  @ManyToOne(() => Supplier, (supplier) => supplier.products, {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'supplierId' })
   supplier: Supplier;
 
-  @OneToMany(() => ProductVariant, variant => variant.product, { cascade: true })
+  @OneToMany(() => ProductVariant, (variant) => variant.product, {
+    cascade: true,
+  })
   variants: ProductVariant[];
 
-  @OneToMany(() => ProductAttributeValue, value => value.product)
+  @OneToMany(() => ProductAttributeValue, (value) => value.product)
   attributeValues: ProductAttributeValue[];
 
-  @OneToMany(() => ProductImage, image => image.product, { cascade: true })
+  @OneToMany(() => ProductImage, (image) => image.product, { cascade: true })
   images: ProductImage[];
 }
