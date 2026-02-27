@@ -1,10 +1,15 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { Branch } from '../../branches/entities/branch.entity';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { BaseEntity } from '../../../entities/base.entity';
+import { Branch } from '../../branches/entities/branch.entity';
 import { Product } from '../../products/entities/product.entity';
 import { ProductVariant } from 'src/module/products/entities/product-variant.entity';
 import { User } from 'src/module/users/entities/user.entity';
 
 @Entity('stock_movements')
+@Index('IDX_stock_movement_branch', ['branch'])
+@Index('IDX_stock_movement_variant', ['variant'])
+@Index('IDX_stock_movement_type', ['type'])
+@Index('IDX_stock_movement_created', ['createdAt'])
 export class StockMovement extends BaseEntity {
   @ManyToOne(() => ProductVariant, variant => variant.stockMovements)
   @JoinColumn({ name: 'variantId' })

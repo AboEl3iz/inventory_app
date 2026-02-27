@@ -17,7 +17,6 @@ import { StockMovement } from '../stock/entities/stock.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
 import { Purchase } from '../purchases/entities/purchase.entity';
 import { ReportService } from '../reports/reports.service';
-import { todo } from 'node:test';
 import { NotificationService } from './notification.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 @Injectable()
@@ -41,8 +40,8 @@ export class SchedulerService {
     private schedulerRegistry: SchedulerRegistry,
     private notificationService: NotificationService,
     private reportService: ReportService,
-   @Inject(WINSTON_MODULE_PROVIDER)
-           private readonly logger: Logger,
+    @Inject(WINSTON_MODULE_PROVIDER)
+    private readonly logger: Logger,
     private eventEmitter: EventEmitter2,
   ) { }
 
@@ -294,7 +293,7 @@ export class SchedulerService {
   // }
 
   @Cron('0 3 15 * *')
-// @Cron('* * * * *') 
+  // @Cron('* * * * *') 
   async cleanupSoftDeleted() {
     this.logger.info('Cleaning up soft-deleted records...');
 
@@ -525,17 +524,17 @@ export class SchedulerService {
     startDate: Date,
     endDate: Date
   ) {
-    const invoices = await this.invoiceRepo.find({
-      where: {
-        branch: { id: branch.id },
-        createdAt: Between(startDate, endDate),
-        status: 'paid',
-      },
-      relations: ['items', 'items.variant', 'items.variant.product'],
-    });
+    const result = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalRevenue')
+      .addSelect('COUNT(invoice.id)', 'totalOrders')
+      .where('invoice.branchId = :branchId', { branchId: branch.id })
+      .andWhere('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .getRawOne();
 
-    const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-    const totalOrders = invoices.length;
+    const totalRevenue = Number(result?.totalRevenue || 0);
+    const totalOrders = Number(result?.totalOrders || 0);
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     return {
@@ -544,7 +543,6 @@ export class SchedulerService {
       totalRevenue,
       totalOrders,
       averageOrderValue,
-      invoices,
     };
   }
 
@@ -576,16 +574,17 @@ export class SchedulerService {
     startDate: Date,
     endDate: Date
   ) {
-    const invoices = await this.invoiceRepo.find({
-      where: {
-        user: { id: user.id },
-        createdAt: Between(startDate, endDate),
-        status: 'paid',
-      },
-    });
+    const result = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalSales')
+      .addSelect('COUNT(invoice.id)', 'totalOrders')
+      .where('invoice.userId = :userId', { userId: user.id })
+      .andWhere('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .getRawOne();
 
-    const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-    const totalOrders = invoices.length;
+    const totalSales = Number(result?.totalSales || 0);
+    const totalOrders = Number(result?.totalOrders || 0);
     const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
     return {

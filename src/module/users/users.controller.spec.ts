@@ -38,7 +38,7 @@ describe('UsersController', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: WINSTON_MODULE_NEST_PROVIDER, useValue: mockLogger },],
-    }) .overrideGuard(mockAuthGuard)
+    }).overrideGuard(mockAuthGuard)
       .useValue({ canActivate: jest.fn(() => true) })
       .overrideGuard(mockAuthorizationGuard)
       .useValue({ canActivate: jest.fn(() => true) })
@@ -82,11 +82,11 @@ describe('UsersController', () => {
         accesstoken: 'mocked-token',
         refreshtoken: 'mocked-refresh-token'
       } as any);
-      const result = await controller.login(dto); 
+      const result = await controller.login(dto);
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('accesstoken', 'mocked-token');
       expect(result).toHaveProperty('refreshtoken', 'mocked-refresh-token');
-    } 
+    }
     )
   });
 
@@ -96,12 +96,12 @@ describe('UsersController', () => {
       jest.spyOn(service, 'refreshtoken').mockResolvedValue({
         id: '1',
         name: 'Test User',
-        email: 'hello@gmail.com'  ,
+        email: 'hello@gmail.com',
         role: 'cashier',
         accesstoken: 'new-mocked-token',
-        refreshtoken  : 'new-mocked-refresh-token'
+        refreshtoken: 'new-mocked-refresh-token'
       } as any);
-      const result = await controller.findOne(refreshtoken);  
+      const result = await controller.refreshToken(refreshtoken);
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('accesstoken', 'new-mocked-token');
       expect(result).toHaveProperty('refreshtoken', 'new-mocked-refresh-token');
@@ -111,8 +111,8 @@ describe('UsersController', () => {
   describe('update', () => {
     it('should update user role', async () => {
       const id = '1';
-      const dto : {
-        role : "admin" | "manager" | "cashier"
+      const dto: {
+        role: "admin" | "manager" | "cashier"
       } = { role: "manager" };
       jest.spyOn(service, 'updateRole').mockResolvedValue('User updated successfully' as any);
       const result = await controller.update(id, dto);
@@ -143,6 +143,6 @@ describe('UsersController', () => {
     });
   }
   );
-  
+
 
 });

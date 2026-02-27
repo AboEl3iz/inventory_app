@@ -1,9 +1,14 @@
-import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
-import { BaseEntity } from '../../../entities/base.entity';import { User } from '../../users/entities/user.entity';
+import { Entity, Column, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
+import { BaseEntity } from '../../../entities/base.entity';
+import { User } from '../../users/entities/user.entity';
 import { Branch } from '../../branches/entities/branch.entity';
 import { InvoiceItem } from './invoice_items.entity';
 
 @Entity('invoices')
+@Index('IDX_invoice_branch', ['branch'])
+@Index('IDX_invoice_status', ['status'])
+@Index('IDX_invoice_created', ['createdAt'])
+@Index('IDX_invoice_branch_status_created', ['branch', 'status', 'createdAt'])
 export class Invoice extends BaseEntity {
   @Column({ unique: true })
   invoiceNumber: string;

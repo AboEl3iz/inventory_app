@@ -36,10 +36,10 @@ export class AnalyticsService {
     private branchRepo: Repository<Branch>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
-  ) {}
+  ) { }
   // ==================== OVERVIEW DASHBOARD ====================
 
-  async  getOverview (params: {
+  async getOverview(params: {
     period: string;
     startDate?: string;
     endDate?: string;
@@ -50,7 +50,7 @@ export class AnalyticsService {
 
     // Current period data
     const currentData = await this.getPeriodData(startDate, endDate, params.branchId);
-    
+
     // Previous period data for comparison
     const previousData = await this.getPeriodData(prevStartDate, prevEndDate, params.branchId);
 
@@ -154,26 +154,42 @@ export class AnalyticsService {
     const startDate = params.startDate ? moment(params.startDate).toDate() : moment().subtract(30, 'days').toDate();
     const endDate = params.endDate ? moment(params.endDate).toDate() : moment().toDate();
 
+    let pgFormat = 'YYYY-MM-DD';
+
+    switch (params.groupBy) {
+      case 'week':
+        pgFormat = 'IYYY-"W"IW';
+        break;
+      case 'month':
+        pgFormat = 'YYYY-MM';
+        break;
+      case 'day':
+      default:
+        pgFormat = 'YYYY-MM-DD';
+    }
+
     let query = this.invoiceRepo
       .createQueryBuilder('invoice')
+      .select(`TO_CHAR(invoice.createdAt, '${pgFormat}')`, 'label')
+      .addSelect('SUM(invoice.totalAmount)', 'revenue')
+      .addSelect('COUNT(invoice.id)', 'orders')
       .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
-      .andWhere('invoice.status = :status', { status: 'paid' });
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .groupBy(`TO_CHAR(invoice.createdAt, '${pgFormat}')`)
+      .orderBy('MIN(invoice.createdAt)', 'ASC');
 
     if (params.branchId) {
       query = query.andWhere('invoice.branchId = :branchId', { branchId: params.branchId });
     }
 
-    const invoices = await query.getMany();
-
-    // Group by time period
-    const grouped = this.groupByTimePeriod(invoices, params.groupBy);
+    const results = await query.getRawMany();
 
     return {
-      labels: grouped.map(g => g.label),
+      labels: results.map(r => r.label),
       data: {
-        revenue: grouped.map(g => g.revenue),
-        orders: grouped.map(g => g.orders),
-        avgOrderValue: grouped.map(g => g.avgOrderValue),
+        revenue: results.map(r => Number(r.revenue)),
+        orders: results.map(r => Number(r.orders)),
+        avgOrderValue: results.map(r => Number(r.orders) > 0 ? Number(r.revenue) / Number(r.orders) : 0),
       },
     };
   }
@@ -310,72 +326,87 @@ export class AnalyticsService {
 
     let query = this.invoiceRepo
       .createQueryBuilder('invoice')
+      .select('EXTRACT(HOUR FROM invoice.createdAt)', 'hour')
+      .addSelect('COUNT(invoice.id)', 'count')
+      .addSelect('SUM(invoice.totalAmount)', 'revenue')
       .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
-      .andWhere('invoice.status = :status', { status: 'paid' });
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .groupBy('EXTRACT(HOUR FROM invoice.createdAt)');
 
     if (params.branchId) {
       query = query.andWhere('invoice.branchId = :branchId', { branchId: params.branchId });
     }
 
-    const invoices = await query.getMany();
+    const results = await query.getRawMany();
 
-    // Group by hour
-    const hourlyData = Array.from({ length: 24 }, (_, hour) => ({
-      hour,
-      count: 0,
-      revenue: 0,
-    }));
-
-    invoices.forEach(invoice => {
-      const hour = moment(invoice.createdAt).hour();
-      hourlyData[hour].count++;
-      hourlyData[hour].revenue += Number(invoice.totalAmount);
+    const hourlyData = Array.from({ length: 24 }, (_, hour) => {
+      const dbHour = results.find(r => Number(r.hour) === hour);
+      return {
+        hour: `${hour.toString().padStart(2, '0')}:00`,
+        orders: dbHour ? Number(dbHour.count) : 0,
+        revenue: dbHour ? Number(dbHour.revenue) : 0,
+      };
     });
 
-    return hourlyData.map(data => ({
-      hour: `${data.hour.toString().padStart(2, '0')}:00`,
-      orders: data.count,
-      revenue: data.revenue,
-    }));
+    return hourlyData;
   }
 
   // ==================== INVENTORY DASHBOARD ====================
 
-  async getInventoryStatus(params: { branchId?: string; status?: string }) {
-    let query = this.inventoryRepo
-      .createQueryBuilder('inventory')
+  async getInventoryStatus(params: { branchId?: string; status?: string; page?: number; limit?: number }) {
+    const page = params.page || 1;
+    const limitParams = params.limit || 50;
+
+    let queryBase = this.inventoryRepo.createQueryBuilder('inventory');
+    if (params.branchId) {
+      queryBase = queryBase.where('inventory.branchId = :branchId', { branchId: params.branchId });
+    }
+
+    // 1. Calculate Summary (avoiding moving full tables into process memory)
+    const summaryResult = await queryBase.clone()
+      .select('COUNT(inventory.id)', 'total')
+      .addSelect('SUM(CASE WHEN inventory.quantity = 0 THEN 1 ELSE 0 END)', 'outOfStock')
+      .addSelect('SUM(CASE WHEN inventory.quantity > 0 AND inventory.quantity <= inventory.minThreshold THEN 1 ELSE 0 END)', 'lowStock')
+      .addSelect('SUM(CASE WHEN inventory.quantity > inventory.minThreshold * 5 THEN 1 ELSE 0 END)', 'overstocked')
+      .addSelect('SUM(CASE WHEN inventory.quantity > inventory.minThreshold AND inventory.quantity <= inventory.minThreshold * 5 THEN 1 ELSE 0 END)', 'inStock')
+      .getRawOne();
+
+    const summary = {
+      total: Number(summaryResult?.total || 0),
+      inStock: Number(summaryResult?.instock || 0),
+      lowStock: Number(summaryResult?.lowstock || 0),
+      outOfStock: Number(summaryResult?.outofstock || 0),
+      overstocked: Number(summaryResult?.overstocked || 0),
+    };
+
+    // 2. Filter paginated records
+    let itemsQuery = queryBase.clone()
       .leftJoinAndSelect('inventory.variant', 'variant')
       .leftJoinAndSelect('variant.product', 'product')
       .leftJoinAndSelect('inventory.branch', 'branch');
 
-    if (params.branchId) {
-      query = query.where('inventory.branchId = :branchId', { branchId: params.branchId });
+    if (params.status && params.status !== 'all') {
+      if (params.status === 'out-of-stock') {
+        itemsQuery = itemsQuery.andWhere('inventory.quantity = 0');
+      } else if (params.status === 'low-stock') {
+        itemsQuery = itemsQuery.andWhere('inventory.quantity > 0 AND inventory.quantity <= inventory.minThreshold');
+      } else if (params.status === 'overstocked') {
+        itemsQuery = itemsQuery.andWhere('inventory.quantity > inventory.minThreshold * 5');
+      } else if (params.status === 'in-stock') {
+        itemsQuery = itemsQuery.andWhere('inventory.quantity > inventory.minThreshold AND inventory.quantity <= inventory.minThreshold * 5');
+      }
     }
 
-    const inventories = await query.getMany();
-
-    const statusBreakdown = {
-      total: inventories.length,
-      inStock: 0,
-      lowStock: 0,
-      outOfStock: 0,
-      overstocked: 0,
-    };
+    const [inventories, totalItems] = await itemsQuery
+      .skip((page - 1) * limitParams)
+      .take(limitParams)
+      .getManyAndCount();
 
     const items = inventories.map(inv => {
       let status = 'in-stock';
-      if (inv.quantity === 0) {
-        status = 'out-of-stock';
-        statusBreakdown.outOfStock++;
-      } else if (inv.quantity <= inv.minThreshold) {
-        status = 'low-stock';
-        statusBreakdown.lowStock++;
-      } else if (inv.quantity > inv.minThreshold * 5) {
-        status = 'overstocked';
-        statusBreakdown.overstocked++;
-      } else {
-        statusBreakdown.inStock++;
-      }
+      if (inv.quantity === 0) status = 'out-of-stock';
+      else if (inv.quantity <= inv.minThreshold) status = 'low-stock';
+      else if (inv.quantity > inv.minThreshold * 5) status = 'overstocked';
 
       return {
         id: inv.id,
@@ -388,14 +419,15 @@ export class AnalyticsService {
       };
     });
 
-    // Filter by status if requested
-    const filteredItems = params.status && params.status !== 'all'
-      ? items.filter(item => item.status === params.status)
-      : items;
-
     return {
-      summary: statusBreakdown,
-      items: filteredItems,
+      summary,
+      items,
+      meta: {
+        total: totalItems,
+        page,
+        limit: limitParams,
+        totalPages: Math.ceil(totalItems / limitParams),
+      },
     };
   }
 
@@ -519,7 +551,7 @@ export class AnalyticsService {
 
     // Turnover Ratio = COGS / Average Inventory
     const turnoverRatio = avgInventoryValue > 0 ? cogs / avgInventoryValue : 0;
-    
+
     // Days to sell inventory = 365 / Turnover Ratio
     const daysToSell = turnoverRatio > 0 ? 365 / turnoverRatio : 0;
 
@@ -761,227 +793,198 @@ export class AnalyticsService {
   //================helper
   // ==================== HELPER FUNCTIONS ====================
 
-private getDateRange(
-  period: string,
-  startDate?: string,
-  endDate?: string,
-): { startDate: Date; endDate: Date } {
-  const now = moment().endOf('day');
-  let start: moment.Moment;
+  private getDateRange(
+    period: string,
+    startDate?: string,
+    endDate?: string,
+  ): { startDate: Date; endDate: Date } {
+    const now = moment().endOf('day');
+    let start: moment.Moment;
 
-  switch (period) {
-    case 'today':
-      start = moment().startOf('day');
-      break;
-    case 'week':
-      start = moment().startOf('week');
-      break;
-    case 'month':
-      start = moment().startOf('month');
-      break;
-    case 'year':
-      start = moment().startOf('year');
-      break;
-    case 'custom':
-      start = startDate ? moment(startDate) : moment().startOf('month');
-      return { startDate: start.toDate(), endDate: endDate ? moment(endDate).endOf('day').toDate() : now.toDate() };
-    default:
-      start = moment().subtract(30, 'days').startOf('day');
-  }
-
-  return { startDate: start.toDate(), endDate: now.toDate() };
-}
-
-private getPreviousPeriod(
-  startDate: Date,
-  endDate: Date,
-): { startDate: Date; endDate: Date } {
-  const duration = moment(endDate).diff(moment(startDate), 'days');
-  const prevEnd = moment(startDate).subtract(1, 'day');
-  const prevStart = moment(prevEnd).subtract(duration, 'days');
-  return { startDate: prevStart.toDate(), endDate: prevEnd.toDate() };
-}
-
-private async getPeriodData(startDate: Date, endDate: Date, branchId?: string) {
-  let query = this.invoiceRepo
-    .createQueryBuilder('invoice')
-    .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
-    .andWhere('invoice.status = :status', { status: 'paid' });
-
-  if (branchId) {
-    query = query.andWhere('invoice.branchId = :branchId', { branchId });
-  }
-
-  const invoices = await query.getMany();
-
-  const revenue = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-  const orders = invoices.length;
-  const avgOrderValue = orders > 0 ? revenue / orders : 0;
-  const customers = new Set(invoices.map(inv => inv.CustomerName)).size;
-
-  return { revenue, orders, avgOrderValue, customers };
-}
-
-private calculateGrowth(current: number, previous: number): number {
-  if (previous === 0 && current === 0) return 0;
-  if (previous === 0) return 100;
-  return ((current - previous) / previous) * 100;
-}
-
-private async getTopProducts(
-  startDate: Date,
-  endDate: Date,
-  branchId?: string,
-  limit = 5,
-  sortBy: 'revenue' | 'quantity' = 'revenue',
-) {
-  let query = this.invoiceItemRepo
-    .createQueryBuilder('item')
-    .leftJoin('item.invoice', 'invoice')
-    .leftJoin('item.variant', 'variant')
-    .leftJoin('variant.product', 'product')
-    .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
-    .andWhere('invoice.status = :status', { status: 'paid' });
-
-  if (branchId) {
-    query = query.andWhere('invoice.branchId = :branchId', { branchId });
-  }
-
-  const results = await query
-    .select('product.id', 'productId')
-    .addSelect('product.name', 'productName')
-    .addSelect('SUM(item.quantity)', 'quantitySold')
-    .addSelect('SUM(item.subtotal)', 'revenue')
-    .groupBy('product.id')
-    .addGroupBy('product.name')
-    .orderBy(sortBy === 'revenue' ? 'revenue' : 'quantitySold', 'DESC')
-    .limit(limit)
-    .getRawMany();
-
-  return results.map(r => ({
-    productId: r.productId,
-    productName: r.productName,
-    quantitySold: Number(r.quantitySold),
-    revenue: Number(r.revenue),
-  }));
-}
-
-private async getLowStockCount(branchId?: string): Promise<number> {
-  let query = this.inventoryRepo
-    .createQueryBuilder('inventory')
-    .where('inventory.quantity <= inventory.minThreshold');
-
-  if (branchId) {
-    query = query.andWhere('inventory.branchId = :branchId', { branchId });
-  }
-
-  return query.getCount();
-}
-
-private groupByTimePeriod(invoices: Invoice[], groupBy: string) {
-  const grouped: Record<string, { revenue: number; orders: number }> = {};
-
-  invoices.forEach(inv => {
-    let key: string;
-    switch (groupBy) {
-      case 'day':
-        key = moment(inv.createdAt).format('YYYY-MM-DD');
+    switch (period) {
+      case 'today':
+        start = moment().startOf('day');
         break;
       case 'week':
-        key = moment(inv.createdAt).format('YYYY-[W]WW');
+        start = moment().startOf('week');
         break;
       case 'month':
-        key = moment(inv.createdAt).format('YYYY-MM');
+        start = moment().startOf('month');
         break;
+      case 'year':
+        start = moment().startOf('year');
+        break;
+      case 'custom':
+        start = startDate ? moment(startDate) : moment().startOf('month');
+        return { startDate: start.toDate(), endDate: endDate ? moment(endDate).endOf('day').toDate() : now.toDate() };
       default:
-        key = moment(inv.createdAt).format('YYYY-MM-DD');
+        start = moment().subtract(30, 'days').startOf('day');
     }
 
-    if (!grouped[key]) grouped[key] = { revenue: 0, orders: 0 };
-    grouped[key].revenue += Number(inv.totalAmount);
-    grouped[key].orders += 1;
-  });
-
-  return Object.keys(grouped).map(key => ({
-    label: key,
-    revenue: grouped[key].revenue,
-    orders: grouped[key].orders,
-    avgOrderValue: grouped[key].orders > 0
-      ? grouped[key].revenue / grouped[key].orders
-      : 0,
-  }));
-}
-
-// ==================== FINANCIAL HELPERS ====================
-
-/**
- * Get total revenue from paid invoices in the period.
- */
-private async getTotalRevenue(startDate: Date, endDate: Date, branchId?: string): Promise<number> {
-  let query = this.invoiceRepo
-    .createQueryBuilder('invoice')
-    .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
-    .andWhere('invoice.status = :status', { status: 'paid' });
-
-  if (branchId) {
-    query = query.andWhere('invoice.branchId = :branchId', { branchId });
+    return { startDate: start.toDate(), endDate: now.toDate() };
   }
 
-  const result = await query
-    .select('SUM(invoice.totalAmount)', 'totalRevenue')
-    .getRawOne<{ totalRevenue: string }>();
-
-  return Number(result?.totalRevenue || 0);
-}
-
-/**
- * Get total expenses (e.g., purchases, salaries, rent) within the period.
- * Assuming you have a Purchase or Expense entity tracking these.
- */
-private async getTotalExpenses(startDate: Date, endDate: Date, branchId?: string): Promise<number> {
-  // If you have a dedicated Expense entity, replace `purchaseRepo` with `expenseRepo`
-  if (!this.purchaseRepo) return 0;
-
-  let query = this.purchaseRepo
-    .createQueryBuilder('purchase')
-    .where('purchase.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
-    .andWhere('purchase.status = :status', { status: 'completed' });
-
-  if (branchId) {
-    query = query.andWhere('purchase.branchId = :branchId', { branchId });
+  private getPreviousPeriod(
+    startDate: Date,
+    endDate: Date,
+  ): { startDate: Date; endDate: Date } {
+    const duration = moment(endDate).diff(moment(startDate), 'days');
+    const prevEnd = moment(startDate).subtract(1, 'day');
+    const prevStart = moment(prevEnd).subtract(duration, 'days');
+    return { startDate: prevStart.toDate(), endDate: prevEnd.toDate() };
   }
 
-  const result = await query
-    .select('SUM(purchase.totalAmount)', 'totalExpenses')
-    .getRawOne<{ totalExpenses: string }>();
+  private async getPeriodData(startDate: Date, endDate: Date, branchId?: string) {
+    let query = this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'revenue')
+      .addSelect('COUNT(invoice.id)', 'orders')
+      .addSelect('COUNT(DISTINCT invoice.CustomerName)', 'customers')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' });
 
-  return Number(result?.totalExpenses || 0);
-}
+    if (branchId) {
+      query = query.andWhere('invoice.branchId = :branchId', { branchId });
+    }
 
-/**
- * Get total COGS (Cost of Goods Sold) based on sold products' purchase cost.
- * This uses InvoiceItem + ProductVariant + Inventory data.
- */
-private async getTotalCOGS(startDate: Date, endDate: Date, branchId?: string): Promise<number> {
-  let query = this.invoiceItemRepo
-    .createQueryBuilder('item')
-    .leftJoin('item.invoice', 'invoice')
-    .leftJoin('item.variant', 'variant')
-    .leftJoin('variant.product', 'product')
-    .leftJoin('variant.inventory', 'inventory')
-    .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
-    .andWhere('invoice.status = :status', { status: 'paid' });
+    const result = await query.getRawOne();
 
-  if (branchId) {
-    query = query.andWhere('invoice.branchId = :branchId', { branchId });
+    const revenue = Number(result?.revenue || 0);
+    const orders = Number(result?.orders || 0);
+    const avgOrderValue = orders > 0 ? revenue / orders : 0;
+    const customers = Number(result?.customers || 0);
+
+    return { revenue, orders, avgOrderValue, customers };
   }
 
-  const result = await query
-    .select('SUM(item.quantity * inventory.purchasePrice)', 'totalCOGS')
-    .getRawOne<{ totalCOGS: string }>();
+  private calculateGrowth(current: number, previous: number): number {
+    if (previous === 0 && current === 0) return 0;
+    if (previous === 0) return 100;
+    return ((current - previous) / previous) * 100;
+  }
 
-  return Number(result?.totalCOGS || 0);
-}
+  private async getTopProducts(
+    startDate: Date,
+    endDate: Date,
+    branchId?: string,
+    limit = 5,
+    sortBy: 'revenue' | 'quantity' = 'revenue',
+  ) {
+    let query = this.invoiceItemRepo
+      .createQueryBuilder('item')
+      .leftJoin('item.invoice', 'invoice')
+      .leftJoin('item.variant', 'variant')
+      .leftJoin('variant.product', 'product')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' });
+
+    if (branchId) {
+      query = query.andWhere('invoice.branchId = :branchId', { branchId });
+    }
+
+    const results = await query
+      .select('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(item.quantity)', 'quantitySold')
+      .addSelect('SUM(item.subtotal)', 'revenue')
+      .groupBy('product.id')
+      .addGroupBy('product.name')
+      .orderBy(sortBy === 'revenue' ? 'revenue' : 'quantitySold', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    return results.map(r => ({
+      productId: r.productId,
+      productName: r.productName,
+      quantitySold: Number(r.quantitySold),
+      revenue: Number(r.revenue),
+    }));
+  }
+
+  private async getLowStockCount(branchId?: string): Promise<number> {
+    let query = this.inventoryRepo
+      .createQueryBuilder('inventory')
+      .where('inventory.quantity <= inventory.minThreshold');
+
+    if (branchId) {
+      query = query.andWhere('inventory.branchId = :branchId', { branchId });
+    }
+
+    return query.getCount();
+  }
+
+
+
+  // ==================== FINANCIAL HELPERS ====================
+
+  /**
+   * Get total revenue from paid invoices in the period.
+   */
+  private async getTotalRevenue(startDate: Date, endDate: Date, branchId?: string): Promise<number> {
+    let query = this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' });
+
+    if (branchId) {
+      query = query.andWhere('invoice.branchId = :branchId', { branchId });
+    }
+
+    const result = await query
+      .select('SUM(invoice.totalAmount)', 'totalRevenue')
+      .getRawOne<{ totalRevenue: string }>();
+
+    return Number(result?.totalRevenue || 0);
+  }
+
+  /**
+   * Get total expenses (e.g., purchases, salaries, rent) within the period.
+   * Assuming you have a Purchase or Expense entity tracking these.
+   */
+  private async getTotalExpenses(startDate: Date, endDate: Date, branchId?: string): Promise<number> {
+    // If you have a dedicated Expense entity, replace `purchaseRepo` with `expenseRepo`
+    if (!this.purchaseRepo) return 0;
+
+    let query = this.purchaseRepo
+      .createQueryBuilder('purchase')
+      .where('purchase.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('purchase.status = :status', { status: 'completed' });
+
+    if (branchId) {
+      query = query.andWhere('purchase.branchId = :branchId', { branchId });
+    }
+
+    const result = await query
+      .select('SUM(purchase.totalAmount)', 'totalExpenses')
+      .getRawOne<{ totalExpenses: string }>();
+
+    return Number(result?.totalExpenses || 0);
+  }
+
+  /**
+   * Get total COGS (Cost of Goods Sold) based on sold products' purchase cost.
+   * This uses InvoiceItem + ProductVariant + Inventory data.
+   */
+  private async getTotalCOGS(startDate: Date, endDate: Date, branchId?: string): Promise<number> {
+    let query = this.invoiceItemRepo
+      .createQueryBuilder('item')
+      .leftJoin('item.invoice', 'invoice')
+      .leftJoin('item.variant', 'variant')
+      .leftJoin('variant.product', 'product')
+      .leftJoin('variant.inventory', 'inventory')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' });
+
+    if (branchId) {
+      query = query.andWhere('invoice.branchId = :branchId', { branchId });
+    }
+
+    const result = await query
+      .select('SUM(item.quantity * inventory.purchasePrice)', 'totalCOGS')
+      .getRawOne<{ totalCOGS: string }>();
+
+    return Number(result?.totalCOGS || 0);
+  }
 
 
 

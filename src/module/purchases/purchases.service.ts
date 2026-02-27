@@ -14,6 +14,7 @@ import { User } from '../users/entities/user.entity';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { InjectQueue } from '@nestjs/bullmq';
 import { CancelPurchaseResponse, CompletePurchaseResponse, CreatePurchaseResponse, DeletePurchaseResponse, PurchaseDetailResponse, PurchaseListItemResponse } from 'src/shared/interfaces/purchases-response';
+import { IUserPayload } from 'src/shared/interfaces/user-payload.interface';
 
 @Injectable()
 export class PurchasesService {
@@ -28,7 +29,7 @@ export class PurchasesService {
     @InjectQueue('PURCHASES_QUEUE') private purchasesQueue,
   ) { }
 
-   async createPurchase(dto: CreatePurchaseDto, user: any): Promise<CreatePurchaseResponse> {
+  async createPurchase(dto: CreatePurchaseDto, user: IUserPayload): Promise<CreatePurchaseResponse> {
     // التحقق من صلاحية إنشاء مشتريات في الفرع
     if (user.role !== Role.admin && dto.branchId !== user.branchId) {
       throw new ForbiddenException('Cannot create purchase for another branch');
@@ -155,7 +156,7 @@ export class PurchasesService {
     });
   }
 
-  async completePurchase(id: string, user: any): Promise<CompletePurchaseResponse> {
+  async completePurchase(id: string, user: IUserPayload): Promise<CompletePurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['items', 'items.variant', 'branch', 'supplier'],
@@ -212,7 +213,7 @@ export class PurchasesService {
     };
   }
 
-  async findAll(user: any): Promise<PurchaseListItemResponse[]> {
+  async findAll(user: IUserPayload): Promise<PurchaseListItemResponse[]> {
     const query = this.purchaseRepo
       .createQueryBuilder('purchase')
       .leftJoinAndSelect('purchase.supplier', 'supplier')
@@ -247,7 +248,7 @@ export class PurchasesService {
     }));
   }
 
-  async findOne(id: string, user: any): Promise<PurchaseDetailResponse> {
+  async findOne(id: string, user: IUserPayload): Promise<PurchaseDetailResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: [
@@ -320,7 +321,7 @@ export class PurchasesService {
     };
   }
 
-  async cancelPurchase(id: string, user: any): Promise<CancelPurchaseResponse> {
+  async cancelPurchase(id: string, user: IUserPayload): Promise<CancelPurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['branch', 'items', 'items.variant'],
@@ -347,7 +348,7 @@ export class PurchasesService {
     }
 
     purchase.status = 'cancelled';
-    
+
     await this.purchasesQueue.add(PURCHASE_CANCELLED, {
       purchaseId: id,
       branchId: purchase.branch.id,
@@ -358,7 +359,7 @@ export class PurchasesService {
         unitCost: item.unitCost,
       })),
     });
-    
+
     const saved = await this.purchaseRepo.save(purchase);
 
     return {
@@ -370,7 +371,7 @@ export class PurchasesService {
     };
   }
 
-  async remove(id: string, user: any): Promise<DeletePurchaseResponse> {
+  async remove(id: string, user: IUserPayload): Promise<DeletePurchaseResponse> {
     const purchase = await this.purchaseRepo.findOne({
       where: { id },
       relations: ['branch'],

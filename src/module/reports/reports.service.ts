@@ -32,32 +32,33 @@ export class ReportService {
   async generateWeeklyReport(startDate: Date, endDate: Date) {
     this.logger.info(`Generating weekly report from ${startDate} to ${endDate}`);
 
-    // Get invoices for the week
-    const invoices = await this.invoiceRepo.find({
-      where: {
-        createdAt: Between(startDate, endDate),
-        status: 'paid',
-      },
-      relations: ['items', 'items.variant', 'items.variant.product'],
-    });
+    // Get current period aggregation
+    const result = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalRevenue')
+      .addSelect('COUNT(invoice.id)', 'totalOrders')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .getRawOne();
 
-    // Get previous week data for comparison
-    const prevWeekStart = moment(startDate).subtract(1, 'week').toDate();
-    const prevWeekEnd = moment(endDate).subtract(1, 'week').toDate();
-    const prevWeekInvoices = await this.invoiceRepo.find({
-      where: {
-        createdAt: Between(prevWeekStart, prevWeekEnd),
-        status: 'paid',
-      },
-    });
-
-    // Calculate metrics
-    const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-    const totalOrders = invoices.length;
+    const totalRevenue = Number(result?.totalRevenue || 0);
+    const totalOrders = Number(result?.totalOrders || 0);
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-    const prevTotalRevenue = prevWeekInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-    const prevTotalOrders = prevWeekInvoices.length;
+    // Get previous period data
+    const prevWeekStart = moment(startDate).subtract(1, 'week').toDate();
+    const prevWeekEnd = moment(endDate).subtract(1, 'week').toDate();
+    
+    const prevResult = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'prevTotalRevenue')
+      .addSelect('COUNT(invoice.id)', 'prevTotalOrders')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate: prevWeekStart, endDate: prevWeekEnd })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .getRawOne();
+
+    const prevTotalRevenue = Number(prevResult?.prevTotalRevenue || 0);
+    const prevTotalOrders = Number(prevResult?.prevTotalOrders || 0);
 
     const revenueGrowth = prevTotalRevenue > 0 
       ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 
@@ -66,25 +67,28 @@ export class ReportService {
       ? ((totalOrders - prevTotalOrders) / prevTotalOrders) * 100 
       : 0;
 
-    // Get top products
-    const productSales = new Map();
-    invoices.forEach(invoice => {
-      invoice.items.forEach(item => {
-        const productId = item.variant.product.id;
-        const existing = productSales.get(productId) || {
-          name: item.variant.product.name,
-          quantity: 0,
-          revenue: 0,
-        };
-        existing.quantity += item.quantity;
-        existing.revenue += Number(item.subtotal);
-        productSales.set(productId, existing);
-      });
-    });
+    // Get top products using QueryBuilder
+    const topProductsRaw = await this.invoiceItemRepo
+      .createQueryBuilder('item')
+      .leftJoin('item.invoice', 'invoice')
+      .leftJoin('item.variant', 'variant')
+      .leftJoin('variant.product', 'product')
+      .select('product.name', 'name')
+      .addSelect('SUM(item.quantity)', 'quantity')
+      .addSelect('SUM(item.subtotal)', 'revenue')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .groupBy('product.id')
+      .addGroupBy('product.name')
+      .orderBy('quantity', 'DESC')
+      .limit(10)
+      .getRawMany();
 
-    const topProducts = Array.from(productSales.values())
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 10);
+    const topProducts = topProductsRaw.map(p => ({
+      name: p.name,
+      quantity: Number(p.quantity),
+      revenue: Number(p.revenue),
+    }));
 
     return {
       weekStart: moment(startDate).format('MMM DD, YYYY'),
@@ -95,7 +99,7 @@ export class ReportService {
       revenueGrowth,
       ordersGrowth,
       topProducts,
-      invoices: invoices.length,
+      invoices: totalOrders,
     };
   }
 
@@ -104,37 +108,36 @@ export class ReportService {
   async generateProfitLossReport(startDate: Date, endDate: Date) {
     this.logger.info(`Generating P&L report from ${startDate} to ${endDate}`);
 
-    // Get revenue from invoices
-    const invoices = await this.invoiceRepo.find({
-      where: {
-        createdAt: Between(startDate, endDate),
-        status: 'paid',
-      },
-      relations: ['items', 'items.variant'],
-    });
+    const revenueResult = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalRevenue')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .getRawOne();
+      
+    const totalRevenue = Number(revenueResult?.totalRevenue || 0);
 
-    const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
+    const cogsResult = await this.invoiceItemRepo
+      .createQueryBuilder('item')
+      .leftJoin('item.invoice', 'invoice')
+      .leftJoin('item.variant', 'variant')
+      .select('SUM(item.quantity * variant.costPrice)', 'cogs')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .getRawOne();
 
-    // Calculate COGS (Cost of Goods Sold)
-    let cogs = 0;
-    invoices.forEach(invoice => {
-      invoice.items.forEach(item => {
-        cogs += item.quantity * Number(item.variant.costPrice);
-      });
-    });
-
+    const cogs = Number(cogsResult?.cogs || 0);
     const grossProfit = totalRevenue - cogs;
     const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
-    // Get purchases (operating expenses)
-    const purchases = await this.purchaseRepo.find({
-      where: {
-        createdAt: Between(startDate, endDate),
-        status: 'completed',
-      },
-    });
+    const expensesResult = await this.purchaseRepo
+      .createQueryBuilder('purchase')
+      .select('SUM(purchase.totalAmount)', 'operatingExpenses')
+      .where('purchase.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('purchase.status = :status', { status: 'completed' })
+      .getRawOne();
 
-    const operatingExpenses = purchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
+    const operatingExpenses = Number(expensesResult?.operatingExpenses || 0);
 
     // Calculate net profit
     const netProfit = grossProfit - operatingExpenses;
@@ -159,22 +162,38 @@ export class ReportService {
   async generateTaxSummary(startDate: Date, endDate: Date) {
     this.logger.info(`Generating tax summary from ${startDate} to ${endDate}`);
 
-    const invoices = await this.invoiceRepo.find({
-      where: {
-        createdAt: Between(startDate, endDate),
-        status: 'paid',
-      },
-    });
-
-    const totalSales = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-    const totalTaxCollected = invoices.reduce((sum, inv) => sum + Number(inv.tax), 0);
-    const taxableAmount = invoices.reduce((sum, inv) => sum + Number(inv.subtotal), 0);
-
-    // Calculate average tax rate
+    const summaryResult = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select('SUM(invoice.totalAmount)', 'totalSales')
+      .addSelect('SUM(invoice.tax)', 'totalTaxCollected')
+      .addSelect('SUM(invoice.subtotal)', 'taxableAmount')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .getRawOne();
+      
+    const totalSales = Number(summaryResult?.totalSales || 0);
+    const totalTaxCollected = Number(summaryResult?.totalTaxCollected || 0);
+    const taxableAmount = Number(summaryResult?.taxableAmount || 0);
     const taxRate = taxableAmount > 0 ? (totalTaxCollected / taxableAmount) * 100 : 0;
 
-    // Tax breakdown by month
-    const monthlyBreakdown = this.groupByMonth(invoices, startDate, endDate);
+    const monthlyRaw = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select("TO_CHAR(invoice.createdAt, 'Mon YYYY')", 'month')
+      .addSelect('SUM(invoice.totalAmount)', 'revenue')
+      .addSelect('SUM(invoice.tax)', 'tax')
+      .addSelect('COUNT(invoice.id)', 'invoiceCount')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .groupBy("TO_CHAR(invoice.createdAt, 'Mon YYYY')")
+      .orderBy('MAX(invoice.createdAt)', 'ASC')
+      .getRawMany();
+
+    const monthlyBreakdown = monthlyRaw.map(m => ({
+      month: m.month,
+      revenue: Number(m.revenue),
+      tax: Number(m.tax),
+      invoiceCount: Number(m.invoiceCount),
+    }));
 
     const quarter = moment(startDate).quarter();
     const year = moment(startDate).year();
@@ -197,37 +216,26 @@ export class ReportService {
   async generateForecastingData() {
     this.logger.info('Generating sales forecasting data');
 
-    // Get sales data for the past 12 months
     const twelveMonthsAgo = moment().subtract(12, 'months').toDate();
     const now = new Date();
 
-    const invoices = await this.invoiceRepo.find({
-      where: {
-        createdAt: Between(twelveMonthsAgo, now),
-        status: 'paid',
-      },
-    });
+    const monthlyRaw = await this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .select("TO_CHAR(invoice.createdAt, 'Mon YYYY')", 'month')
+      .addSelect('SUM(invoice.totalAmount)', 'revenue')
+      .addSelect('COUNT(invoice.id)', 'orders')
+      .where('invoice.createdAt BETWEEN :startDate AND :endDate', { startDate: twelveMonthsAgo, endDate: now })
+      .andWhere('invoice.status = :status', { status: 'paid' })
+      .groupBy("TO_CHAR(invoice.createdAt, 'Mon YYYY')")
+      .orderBy('MAX(invoice.createdAt)', 'ASC')
+      .getRawMany();
 
-    // Group by month
-    const monthlyData : { month: any; revenue: number; orders: number; averageOrderValue: number; }[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const monthStart = moment().subtract(i, 'months').startOf('month').toDate();
-      const monthEnd = moment().subtract(i, 'months').endOf('month').toDate();
-
-      const monthInvoices = invoices.filter(inv => 
-        inv.createdAt >= monthStart && inv.createdAt <= monthEnd
-      );
-
-      const revenue = monthInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-      const orders = monthInvoices.length;
-
-      monthlyData.push({
-        month: moment(monthStart).format('MMM YYYY'),
-        revenue,
-        orders,
-        averageOrderValue: orders > 0 ? revenue / orders : 0,
-      });
-    }
+    const monthlyData = monthlyRaw.map(m => ({
+      month: m.month,
+      revenue: Number(m.revenue),
+      orders: Number(m.orders),
+      averageOrderValue: Number(m.orders) > 0 ? Number(m.revenue) / Number(m.orders) : 0,
+    }));
 
     // Simple linear regression for next month prediction
     const prediction = this.predictNextMonth(monthlyData);
@@ -300,35 +308,6 @@ export class ReportService {
 
   // ==================== HELPER METHODS ====================
   
-  private groupByMonth(invoices: Invoice[], startDate: Date, endDate: Date) {
-    const months : { month: any; revenue: number; tax: number; invoiceCount: number; } []= [];
-    let current = moment(startDate);
-    const end = moment(endDate);
-
-    while (current <= end) {
-      const monthStart = current.clone().startOf('month').toDate();
-      const monthEnd = current.clone().endOf('month').toDate();
-
-      const monthInvoices = invoices.filter(inv => 
-        inv.createdAt >= monthStart && inv.createdAt <= monthEnd
-      );
-
-      const revenue = monthInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount), 0);
-      const tax = monthInvoices.reduce((sum, inv) => sum + Number(inv.tax), 0);
-
-      months.push({
-        month: current.format('MMM YYYY'),
-        revenue,
-        tax,
-        invoiceCount: monthInvoices.length,
-      });
-
-      current.add(1, 'month');
-    }
-
-    return months;
-  }
-
   private predictNextMonth(monthlyData: any[]) {
     // Simple moving average prediction
     const lastThreeMonths = monthlyData.slice(-3);

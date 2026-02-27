@@ -11,8 +11,9 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { ProductVariant } from "src/module/products/entities/product-variant.entity";
 import { In, Repository } from "typeorm";
 import { Role } from "src/common/decorator/roles.decorator";
+import { IUserPayload } from "src/shared/interfaces/user-payload.interface";
 @Processor('INVOICES_QUEUE')
-export class InvoicesListener extends WorkerHost  {
+export class InvoicesListener extends WorkerHost {
     async process(job: Job, token?: string): Promise<any> {
         if (job.name === INVOICE_CREATED)
             return this.handleInvoiceCreated(job.data);
@@ -26,14 +27,14 @@ export class InvoicesListener extends WorkerHost  {
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
         @InjectQueue('INVOICES_QUEUE') private readonly invoicesQueue: Queue,
-         @InjectRepository(ProductVariant)
+        @InjectRepository(ProductVariant)
         private readonly variantRepo: Repository<ProductVariant>,
     ) {
         super();
     }
-/**
-     * 🧮 Handle invoice creation → Decrease stock
-     */
+    /**
+         * 🧮 Handle invoice creation → Decrease stock
+         */
     async handleInvoiceCreated(payload: {
         invoiceId: string;
         branchId: string;
@@ -42,7 +43,7 @@ export class InvoicesListener extends WorkerHost  {
         invoiceTax?: number;
         invoiceSubtotal?: number;
         invoiceTotalAmount?: number;
-        user?: any;
+        user?: IUserPayload;
         customer?: { email?: string; name?: string };
     }) {
         this.logger.info(`💰 Invoice created ${payload.invoiceId} → decreasing stock`);
@@ -51,10 +52,12 @@ export class InvoicesListener extends WorkerHost  {
 
         // ✅ Create system context for internal stock adjustment
         // This bypasses user permission checks since the invoice was already validated
-        const systemContext = {
-            id: payload.user?.id,
+        const systemContext: IUserPayload = {
+            id: payload.user?.id || 'system',
+            email: payload.user?.email || 'system@inventory.local',
+            name: payload.user?.name || 'System',
             branchId: payload.branchId, // The branch where the invoice was created
-            role: payload.user?.role || 'cashier', // Keep the actual user role
+            role: payload.user?.role || Role.cashier, // Keep the actual user role
             isSystemOperation: true, // Flag to bypass branch access checks
         };
 
@@ -77,7 +80,7 @@ export class InvoicesListener extends WorkerHost  {
         if (payload.customer?.email) {
             try {
                 const variantIds = payload.items.map(i => i.variantId);
-                
+
                 // ✅ Fix: Use In() with proper array
                 const variants = await this.variantRepo.find({
                     where: { id: In(variantIds) }, // In() expects array, not string
@@ -134,7 +137,7 @@ export class InvoicesListener extends WorkerHost  {
                     template: 'invoices',
                     data: {
                         invoiceId: payload.invoiceId,
-                        branchName: payload.user?.branch?.name || 'Unknown Branch',
+                        branchName: payload.branchId || 'Unknown Branch',
                         customer: payload.customer,
                         items: enrichedItems,
                         subtotal: payload.invoiceSubtotal || itemsTotal,
@@ -154,14 +157,14 @@ export class InvoicesListener extends WorkerHost  {
             this.logger.warn(`⚠️ Some stock adjustments failed for invoice ${payload.invoiceId}`);
         }
     }
-/**
-     * ❌ Handle invoice cancellation → Increase stock
-     */
+    /**
+         * ❌ Handle invoice cancellation → Increase stock
+         */
     async handleInvoiceCancelled(payload: {
         invoiceId: string;
         branchId: string;
         items: { variantId: string; quantity: number }[];
-        user?: any;
+        user?: IUserPayload;
         customer?: { email?: string; name?: string };
     }) {
         this.logger.info(`🧾 Invoice cancelled ${payload.invoiceId} → increasing stock`);
@@ -169,10 +172,12 @@ export class InvoicesListener extends WorkerHost  {
         const errors: string[] = [];
 
         // ✅ Create system context for stock restoration
-        const systemContext = {
-            id: payload.user?.id,
+        const systemContext: IUserPayload = {
+            id: payload.user?.id || 'system',
+            email: payload.user?.email || 'system@inventory.local',
+            name: payload.user?.name || 'System',
             branchId: payload.branchId,
-            role: payload.user?.role || 'cashier',
+            role: payload.user?.role || Role.cashier,
             isSystemOperation: true, // Flag to bypass branch access checks
         };
 
@@ -195,7 +200,7 @@ export class InvoicesListener extends WorkerHost  {
         if (payload.customer?.email) {
             try {
                 const variantIds = payload.items.map(i => i.variantId);
-                
+
                 const variants = await this.variantRepo.find({
                     where: { id: In(variantIds) },
                     relations: ['product', 'values', 'values.attributeValue', 'values.attributeValue.attribute'],
@@ -234,7 +239,7 @@ export class InvoicesListener extends WorkerHost  {
                     template: 'invoices-cancelled',
                     data: {
                         invoiceId: payload.invoiceId,
-                        branchName: payload.user?.branch?.name || 'Unknown Branch',
+                        branchName: payload.branchId || 'Unknown Branch',
                         customer: payload.customer,
                         items: enrichedItems,
                     },

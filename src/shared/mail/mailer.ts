@@ -1,5 +1,5 @@
 import Email from "email-templates";
-import emilConfig from "src/config/email.config";
+import emailConfig from "src/config/email.config";
 import 'dotenv/config';
 import { config } from "dotenv";
 config();
@@ -8,7 +8,7 @@ async function sendEmail({ to, template, data }) {
         const email = new Email({
             message: { from: `My App <${process.env.EMAIL_FROM_ADDRESS}>` },
             send: true,
-            transport: emilConfig,
+            transport: emailConfig,
             views: {
                 root: 'src/shared/mail/templates/',
                 options: { extension: 'pug' }

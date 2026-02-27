@@ -13,6 +13,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Role } from 'src/common/decorator/roles.decorator';
 import { StockMovement } from '../stock/entities/stock.entity';
 import { AdjustStockResponse, CreateInventoryResponse, InventoryDetailResponse, InventoryListItemResponse, LowStockItemResponse, TransferStockResponse, UpdateInventoryResponse } from 'src/shared/interfaces/inventory-response';
+import { IUserPayload } from 'src/shared/interfaces/user-payload.interface';
+
 @Injectable()
 export class InventoryService {
   constructor(
@@ -22,9 +24,9 @@ export class InventoryService {
     @InjectRepository(StockMovement) private readonly movementRepo: Repository<StockMovement>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
-   private cacheKey(branchId?: string) {
+  private cacheKey(branchId?: string) {
     return branchId ? `inventory:branch:${branchId}` : 'inventory:all';
   }
 
@@ -40,7 +42,7 @@ export class InventoryService {
     return variant;
   }
 
-  private checkBranchAccess(user: any, branchId: string) {
+  private checkBranchAccess(user: IUserPayload, branchId: string) {
     if (user.role === Role.admin) return;
     if (user.branchId !== branchId)
       throw new ForbiddenException('You are not allowed to access this branch inventory');
@@ -68,14 +70,14 @@ export class InventoryService {
     await this.movementRepo.save(movement);
   }
 
-  private getStockStatus(quantity: number, minThreshold: number): 'out_of_stock' | 'low_stock' | 'in_stock' | 'overstocked' {
+  getStockStatus(quantity: number, minThreshold: number): 'out_of_stock' | 'low_stock' | 'in_stock' | 'overstocked' {
     if (quantity === 0) return 'out_of_stock';
     if (quantity <= minThreshold) return 'low_stock';
     if (quantity > minThreshold * 10) return 'overstocked';
     return 'in_stock';
   }
 
-  async create(dto: CreateInventoryDto, user: any): Promise<CreateInventoryResponse> {
+  async create(dto: CreateInventoryDto, user: IUserPayload): Promise<CreateInventoryResponse> {
     this.checkBranchAccess(user, dto.branchId);
 
     const branch = await this.findBranchOrThrow(dto.branchId);
@@ -136,13 +138,13 @@ export class InventoryService {
     };
   }
 
- async adjustStock(branchId: string, variantId: string, qtyChange: number, user: any): Promise<AdjustStockResponse> {
+  async adjustStock(branchId: string, variantId: string, qtyChange: number, user: IUserPayload): Promise<AdjustStockResponse> {
     // ✅ Skip branch access check for system operations (like invoice processing)
     const isSystemOperation = user?.isSystemOperation === true;
-    
+
     if (!isSystemOperation) {
       this.checkBranchAccess(user, branchId);
-      
+
       // Cashiers cannot manually increase stock
       if (user.role === Role.cashier && qtyChange > 0)
         throw new ForbiddenException('Cashier cannot manually increase stock');
@@ -171,12 +173,12 @@ export class InventoryService {
     // Determine movement type and notes based on context
     let movementType: 'sale' | 'purchase' | 'adjustment' | 'return' | 'transfer' | 'damage';
     let notes: string;
-    
+
     if (isSystemOperation) {
       // System operation (invoice/purchase processing)
       movementType = qtyChange < 0 ? 'sale' : 'return';
-      notes = qtyChange < 0 
-        ? 'Stock decreased due to invoice creation' 
+      notes = qtyChange < 0
+        ? 'Stock decreased due to invoice creation'
         : 'Stock restored due to invoice cancellation';
     } else {
       // Manual adjustment
@@ -218,7 +220,7 @@ export class InventoryService {
     toBranchId: string,
     variantId: string,
     qty: number,
-    user: any
+    user: IUserPayload
   ): Promise<TransferStockResponse> {
     if (![Role.admin, Role.manager].includes(user.role))
       throw new ForbiddenException('Only admin or manager can transfer stock');
@@ -304,11 +306,11 @@ export class InventoryService {
     });
   }
 
-  async findAll(user: any, branchId?: string): Promise<InventoryListItemResponse[]> {
+  async findAll(user: IUserPayload, branchId?: string): Promise<InventoryListItemResponse[]> {
     if (user.role !== Role.admin) branchId = user.branchId;
     const key = this.cacheKey(branchId);
     const cached = await this.cacheManager.get<Inventory[]>(key);
-    
+
     let data: Inventory[];
     if (cached) {
       data = cached;
@@ -350,7 +352,7 @@ export class InventoryService {
     }));
   }
 
-  async findOne(id: string, user: any): Promise<InventoryDetailResponse> {
+  async findOne(id: string, user: IUserPayload): Promise<InventoryDetailResponse> {
     const inv = await this.invRepo.findOne({
       where: { id },
       relations: ['branch', 'variant', 'variant.product'],
@@ -393,15 +395,15 @@ export class InventoryService {
     };
   }
 
-  async update(id: string, dto: UpdateInventoryDto, user: any): Promise<UpdateInventoryResponse> {
+  async update(id: string, dto: UpdateInventoryDto, user: IUserPayload): Promise<UpdateInventoryResponse> {
     const record = await this.invRepo.findOne({
       where: { id },
       relations: ['branch', 'variant', 'variant.product'],
     });
     if (!record) throw new NotFoundException('Inventory not found');
     this.checkBranchAccess(user, record.branch.id);
-    
-    if(dto.quantity && dto.quantity < record.minThreshold){
+
+    if (dto.quantity && dto.quantity < record.minThreshold) {
       throw new BadRequestException('Quantity cannot be less than minimum threshold');
     }
 
@@ -422,7 +424,7 @@ export class InventoryService {
     };
   }
 
-  async getLowStock(user: any, threshold = 5): Promise<LowStockItemResponse[]> {
+  async getLowStock(user: IUserPayload, threshold = 5): Promise<LowStockItemResponse[]> {
     const query = this.invRepo
       .createQueryBuilder('inv')
       .leftJoinAndSelect('inv.variant', 'v')
@@ -458,7 +460,7 @@ export class InventoryService {
     }));
   }
 
-  async findOneByVarientAndBranch(variantId: string, branchId: string): Promise<InventoryDetailResponse | null> {
+  async findOneByVariantAndBranch(variantId: string, branchId: string): Promise<InventoryDetailResponse | null> {
     const inv = await this.invRepo.findOne({
       where: { variant: { id: variantId }, branch: { id: branchId } },
       relations: ['branch', 'variant', 'variant.product'],

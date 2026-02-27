@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,28 +11,32 @@ import { Product } from '../products/entities/product.entity';
 import { User } from '../users/entities/user.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
 import { Role } from 'src/common/decorator/roles.decorator';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import { Logger as WinstonLogger } from 'winston';
 
 @Injectable()
 export class BranchesService {
-  constructor(@InjectRepository(Branch) private branchrepo: Repository<Branch>,
+  constructor(
+    @InjectRepository(Branch) private readonly branchrepo: Repository<Branch>,
     @InjectRepository(Inventory)
     private readonly inventoryRepository: Repository<Inventory>,
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
     @InjectRepository(ProductVariant)
     private readonly variantRepository: Repository<ProductVariant>,
-    @InjectRepository(User) private userRepository: Repository<User>,
-    @InjectRepository(Invoice) private invoiceRepository: Repository<Invoice>,
-
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Invoice) private readonly invoiceRepository: Repository<Invoice>,
+    @Inject(WINSTON_MODULE_NEST_PROVIDER)
+    private readonly logger: WinstonLogger,
   ) { }
   async create(createBranchDto: CreateBranchDto, userId: string): Promise<IBranchResponse> {
-    
+
     if (await this.branchrepo.findOne({ where: { name: createBranchDto.name } })) {
       throw new BadRequestException('Branch name already exists');
     }
 
     const branch = await this.branchrepo.create(createBranchDto);
-   
+
     await this.branchrepo.save(branch);
     return {
       id: branch.id,
@@ -68,9 +72,9 @@ export class BranchesService {
       where: { id: managerpayload.id },
       relations: ['branch']
     });
-    console.debug(`Manager branch ID: ${manager?.branch?.id}, Requested branch ID: ${branchId} and his role is ${managerpayload.role}`);
+    this.logger.debug(`Manager branch ID: ${manager?.branch?.id}, Requested branch ID: ${branchId}, role: ${managerpayload.role}`);
 
-    if ( (managerpayload.role !== "admin") && (manager!.branch?.id === branchId)) {
+    if ((managerpayload.role !== "admin") && (manager!.branch?.id !== branchId)) {
       throw new ForbiddenException('You do not have access to this branch');
     }
 
@@ -164,7 +168,7 @@ export class BranchesService {
   async findOne(id: string): Promise<IBranchResponse> {
     const branch = await this.branchrepo.findOne({ where: { id } });
     if (!branch) {
-      throw new BadRequestException('Branch not found');
+      throw new NotFoundException('Branch not found');
     }
     return {
       id: branch.id,
@@ -203,13 +207,13 @@ export class BranchesService {
     };
   }
 
-  async remove(id: string): Promise<string> {
+  async remove(id: string): Promise<{ message: string }> {
     const branch = await this.branchrepo.findOne({ where: { id } });
     if (!branch) {
-      throw new BadRequestException('Branch not found');
+      throw new NotFoundException('Branch not found');
     }
-    await this.branchrepo.remove(branch);
-    return 'Branch removed successfully';
+    await this.branchrepo.softRemove(branch);
+    return { message: 'Branch removed successfully' };
   }
 
   private async getActualBranchProfit(branchId: string): Promise<number> {

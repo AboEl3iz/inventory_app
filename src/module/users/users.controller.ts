@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, ParseUUIDPipe } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -11,38 +11,33 @@ import { ApiTags, ApiOperation, ApiParam, ApiResponse, ApiBearerAuth, ApiBody } 
 @Controller('users')
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
-@UseGuards()
 export class UsersController {
-  private readonly logger = new Logger('UsersController');
-  constructor(private readonly usersService: UsersService) {
-    
-  }
-  
+  constructor(private readonly usersService: UsersService) { }
+
   @Post('register')
   @ApiOperation({ summary: 'Register new user', description: 'Create a new user account. Only admin and manager can perform this action.' })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @ApiResponse({ status: 400, description: 'Invalid user data' })
-  @Roles(Role.admin , Role.manager)
-  @UseGuards(AuthenticationGuard , AuthorizationGuard)
+  @Roles(Role.admin, Role.manager)
+  @UseGuards(AuthenticationGuard, AuthorizationGuard)
   register(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
 
-  @Get('login')
+  @Post('login')
   @ApiOperation({ summary: 'User login', description: 'Authenticate user and get JWT token' })
   @ApiResponse({ status: 200, description: 'Login successful, JWT token returned' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  login(@Body() LoginUserDto: LoginUserDto) {
-    return this.usersService.login(LoginUserDto);
+  login(@Body() loginUserDto: LoginUserDto) {
+    return this.usersService.login(loginUserDto);
   }
 
-  @Get('refreshtoken/:refreshtoken')
+  @Post('refresh-token')
   @ApiOperation({ summary: 'Refresh authentication token', description: 'Get a new JWT token using refresh token' })
-  @ApiParam({ name: 'refreshtoken', description: 'Refresh token' })
   @ApiResponse({ status: 200, description: 'New token generated successfully' })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  findOne(@Param('refreshtoken') refreshtoken: string) {
-    return this.usersService.refreshtoken(refreshtoken);
+  refreshToken(@Body('refreshToken') refreshToken: string) {
+    return this.usersService.refreshtoken(refreshToken);
   }
 
   @Patch('role/:id')
@@ -51,8 +46,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User role updated successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @Roles(Role.admin)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  @UseGuards(AuthenticationGuard, AuthorizationGuard)
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.updateRole(id, updateUserDto);
   }
 
@@ -70,8 +65,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @Roles(Role.admin)
-  @UseGuards(AuthenticationGuard,AuthorizationGuard)
-  remove(@Param('id') id: string) {
+  @UseGuards(AuthenticationGuard, AuthorizationGuard)
+  remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
   }
 }

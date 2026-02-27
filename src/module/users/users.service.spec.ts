@@ -8,9 +8,10 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Auth } from '../auth/entities/auth.entity';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { compare } from 'bcrypt';
 import { UpdateUserDto } from './dto/update-user.dto';
+
 const mockUser = {
   id: '1',
   name: 'Karim',
@@ -35,6 +36,7 @@ const mockUserRepo = {
   save: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
+  softRemove: jest.fn(),
 };
 
 const mockAuthRepo = {
@@ -50,6 +52,10 @@ const mockAuthService = {
 
 const mockJwtService = {
   sign: jest.fn(),
+};
+
+const mockConfigService = {
+  get: jest.fn().mockReturnValue(10),
 };
 
 const mockLogger = {
@@ -76,7 +82,7 @@ describe('UsersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        ConfigService,
+        { provide: ConfigService, useValue: mockConfigService },
         { provide: WINSTON_MODULE_NEST_PROVIDER, useValue: mockLogger },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
         { provide: getRepositoryToken(Auth), useValue: mockAuthRepo },
@@ -105,8 +111,6 @@ describe('UsersService', () => {
         password: '123456',
       });
 
-
-
       expect(result).toEqual({
         id: mockUser.id,
         name: mockUser.name,
@@ -120,7 +124,6 @@ describe('UsersService', () => {
       expect(mockUserRepo.create).toHaveReturnedWith(mockUser);
       expect(mockAuthService.create).toHaveBeenCalled();
       expect(mockJwtService.sign).toHaveBeenCalled();
-
     });
 
     it('should throw error if email exists', async () => {
@@ -138,7 +141,7 @@ describe('UsersService', () => {
       mockJwtService.sign.mockReturnValue('jwt-token');
       mockAuthRepo.findOne.mockResolvedValue(null);
       mockAuthService.create.mockResolvedValue(mockAuth);
-      const result = await service.login({ email: 'karim@test .com', password: '123456' });
+      const result = await service.login({ email: 'karim@test.com', password: '123456' });
 
       expect(result).toEqual({
         id: mockUser.id,
@@ -147,13 +150,13 @@ describe('UsersService', () => {
         role: mockUser.role,
         branchId: '',
         purchases: [],
-        invoivses: [],
+        invoices: [],
         accesstoken: 'jwt-token',
         refreshtoken: 'refresh-token-uuid',
       });
 
       expect(mockUserRepo.findOne).toHaveBeenCalledWith({
-        where: { email: 'karim@test .com' },
+        where: { email: 'karim@test.com' },
         relations: ['purchases', 'invoices', 'branch'],
       });
       expect(require('bcrypt').compare).toHaveBeenCalledWith('123456', 'hashed_pass');
@@ -163,79 +166,48 @@ describe('UsersService', () => {
     it('should throw error for invalid email', async () => {
       mockUserRepo.findOne.mockResolvedValue(null);
       await expect(
-        service.login({ email: 'karim@test .com', password: '123456' }),
+        service.login({ email: 'karim@test.com', password: '123456' }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw error for invalid password', async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
-      jest.spyOn(require('bcrypt'), 'compare').mockResolvedValue(false);
+      jest.spyOn(require('bcrypt'), 'compare').mockResolvedValueOnce(false);
       await expect(
-        service.login({ email: 'karim@test .com', password: 'wrongpass' }),
+        service.login({ email: 'karim@test.com', password: 'wrongpass' }),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should handle existing but expired refresh token', async () => {
-      const user = { id: 1, email: 'admin@test.com', role: 'admin' } as any;
-
-      const mockTokens = {
-        accesstoken: 'access-token',
-        refreshtoken: 'refresh-token',
-        oldRefreshToken: {
-          id: 5,
-          expiresAt: new Date(Date.now() - 1000), // expired
-        },
+    it('should always rotate refresh token on login', async () => {
+      const existingToken = {
+        id: 'a1',
+        refreshToken: 'old-token',
+        expiresAt: new Date(Date.now() + 100000),
+        user: mockUser,
       };
 
-      jest.spyOn(service, 'generateTokens').mockResolvedValue(mockTokens as any);
+      mockUserRepo.findOne.mockResolvedValue(mockUser);
+      mockJwtService.sign.mockReturnValue('jwt-token');
+      mockAuthRepo.findOne.mockResolvedValue(existingToken);
+      mockAuthService.create.mockResolvedValue(mockAuth);
 
-      const { oldRefreshToken } = await service.generateTokens(user);
+      await service.login({ email: 'karim@test.com', password: '123456' });
 
-      if (oldRefreshToken && oldRefreshToken.expiresAt < new Date()) {
-        await mockAuthRepo.remove(oldRefreshToken);
-        await mockAuthService.create({ user: user, refreshToken: mockTokens.refreshtoken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) });
-      }
-
-      expect(mockAuthRepo.remove).toHaveBeenCalledWith(oldRefreshToken);
-      expect(mockAuthService.create).toHaveBeenCalledWith({ user: user, refreshToken: mockTokens.refreshtoken, expiresAt: expect.any(Date) });
-      expect(mockAuthService.create).toHaveBeenCalledTimes(1);
-
-
-    });
-
-    it('should handle existing and valid refresh token', async () => {
-      const user = { id: 1, email: 'admin@test.com', role: 'admin' } as any;
-
-      const mockTokens = {
-        accesstoken: 'access-token',
-        refreshtoken: 'refresh-token',
-        oldRefreshToken: {
-          id: 5,
-          expiresAt: new Date(Date.now() + 1000), // expired
-        },
-      };
-      jest.spyOn(service, 'generateTokens').mockResolvedValue(mockTokens as any);
-
-      const { oldRefreshToken } = await service.generateTokens(user);
-      if (oldRefreshToken && oldRefreshToken.expiresAt < new Date()) {
-        await mockAuthRepo.remove(oldRefreshToken);
-        await mockAuthService.create({ user: user, refreshToken: mockTokens.refreshtoken, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) });
-      }
-      expect(mockAuthRepo.remove).not.toHaveBeenCalled();
-      expect(mockAuthService.create).not.toHaveBeenCalled();
-
+      // Old token should always be removed regardless of expiry
+      expect(mockAuthRepo.remove).toHaveBeenCalledWith(existingToken);
+      // New token should always be created
+      expect(mockAuthService.create).toHaveBeenCalled();
     });
   });
 
   // 🧪 TEST: Refresh token
   describe('refreshtoken()', () => {
     it('should refresh tokens successfully with valid refresh token', async () => {
-      const oldref = { ...mockAuth, expiresAt: new Date(Date.now() + 1000) }
+      const oldref = { ...mockAuth, expiresAt: new Date(Date.now() + 1000) };
       mockAuthRepo.findOne.mockResolvedValue(oldref);
       mockJwtService.sign.mockReturnValue('new-jwt-token');
       mockAuthService.create.mockResolvedValue(mockAuth);
       const result = await service.refreshtoken('refresh123');
-
 
       expect(result).toEqual({
         id: mockUser.id,
@@ -244,14 +216,15 @@ describe('UsersService', () => {
         role: mockUser.role,
         branchId: '',
         purchases: [],
-        invoivses: [],
+        invoices: [],
         accesstoken: 'new-jwt-token',
         refreshtoken: 'refresh-token-uuid',
       });
-      expect(mockAuthRepo.findOne).toHaveBeenCalledWith({ where: { refreshToken: 'refresh123' }, relations: ['user'] });
-      expect(mockAuthRepo.remove).toHaveBeenCalledWith(
-        oldref
-      );
+      expect(mockAuthRepo.findOne).toHaveBeenCalledWith({
+        where: { refreshToken: 'refresh123' },
+        relations: ['user', 'user.branch', 'user.purchases', 'user.invoices'],
+      });
+      expect(mockAuthRepo.remove).toHaveBeenCalledWith(oldref);
       expect(mockAuthService.create).toHaveBeenCalled();
       expect(mockJwtService.sign).toHaveBeenCalled();
     });
@@ -268,51 +241,40 @@ describe('UsersService', () => {
     });
   });
 
-
-  describe('update role()', () => {
+  describe('updateRole()', () => {
     it('should update user role successfully', async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
-      mockUserRepo.update.mockResolvedValue('User updated successfully' as string);
+      mockUserRepo.save.mockResolvedValue(mockUser);
       const result = await service.updateRole('1', { role: 'admin' });
-      expect(result).toEqual('User updated successfully');
+      expect(result).toEqual('User role updated successfully');
       expect(mockUserRepo.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
-      expect(mockUserRepo.update).toHaveBeenCalledTimes(1);
-    }
-    ),
-      it('should throw error if user not found', async () => {
-        mockUserRepo.findOne.mockResolvedValue(null);
-        await expect(service.updateRole('1', { role: 'admin' })).rejects.toThrow(BadRequestException);
-      });
+    });
+
+    it('should throw error if user not found', async () => {
+      mockUserRepo.findOne.mockResolvedValue(null);
+      await expect(service.updateRole('1', { role: 'admin' })).rejects.toThrow(NotFoundException);
+    });
   });
 
-  describe('update profile()', () => {
+  describe('updateProfile()', () => {
     it('should update user profile successfully', async () => {
       const userId = 'user_1';
       const updateUserDto = { name: 'New Name', password: 'newpass123' };
-      mockUserRepo.findOne.mockResolvedValue({ ...mockAuth, password: updateUserDto.password })
-      const encryptedPassword = 'hashed-newpass';
+      mockUserRepo.findOne.mockResolvedValue({ ...mockUser, id: userId });
+      mockUserRepo.save.mockResolvedValue({ ...mockUser, id: userId, name: 'New Name' });
 
+      const result = await service.updateProfile(userId, updateUserDto);
 
-      const result = await service.updateProfile(userId, updateUserDto)
+      expect(mockUserRepo.findOne).toHaveBeenCalledTimes(1);
+      expect(mockUserRepo.save).toHaveBeenCalled();
+      expect(result).toBe('Profile updated successfully');
+    });
 
+    it('should throw NotFoundException if user not found', async () => {
+      mockUserRepo.findOne.mockResolvedValue(null);
+      await expect(service.updateProfile('user_1', { name: 'Name' })).rejects.toThrow(NotFoundException);
+    });
 
-      expect((mockUserRepo.findOne)).toHaveBeenCalledTimes(1)
-      expect(mockUserRepo.update).toHaveBeenCalledWith(
-        userId,
-        expect.objectContaining(
-          {
-            password: 'hashed_pass',
-            name: updateUserDto.name
-          }
-        )
-      )
-      expect(result).toBe('User updated successfully')
-
-    }),
-      it('should throw BadRequestException if user not found', async () => {
-        mockUserRepo.findOne.mockResolvedValue(null);
-        await expect(service.updateProfile('user_1', { name: 'Name' })).rejects.toThrow(BadRequestException);
-      });
     it('should throw ForbiddenException if trying to change role', async () => {
       mockUserRepo.findOne.mockResolvedValue({ id: 'user-1' } as any);
       await expect(service.updateProfile('user-1', { role: 'admin' })).rejects.toThrow(ForbiddenException);
@@ -320,21 +282,18 @@ describe('UsersService', () => {
   });
 
   describe('remove()', () => {
-    it('should delete user successfuly', async () => {
+    it('should soft delete user successfully', async () => {
       const userId = 'user_1';
+      mockUserRepo.findOne.mockResolvedValue({ ...mockUser, id: userId });
+      mockUserRepo.softRemove.mockResolvedValue(undefined);
 
-      mockUserRepo.delete.mockResolvedValue(
-        undefined
-      )
+      await service.remove(userId);
+      expect(mockUserRepo.softRemove).toHaveBeenCalledTimes(1);
+    });
 
-      const result = await service.remove(userId);
-      expect(mockUserRepo.delete).toHaveBeenCalledTimes(1)
-      expect(mockUserRepo.delete).toHaveBeenCalledWith(userId)
-      expect(result).toBeUndefined
-
-    }
-
-    )
-  })
-
+    it('should throw NotFoundException if user not found', async () => {
+      mockUserRepo.findOne.mockResolvedValue(null);
+      await expect(service.remove('user_1')).rejects.toThrow(NotFoundException);
+    });
+  });
 });
