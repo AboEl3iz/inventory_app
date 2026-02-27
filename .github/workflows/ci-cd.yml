@@ -27,7 +27,7 @@ env:
 jobs:
   # ─── Lint ───
   lint:
-    name: 🔍 Lint
+    name:  Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -47,7 +47,7 @@ jobs:
 
   # ─── Test ───
   test:
-    name: 🧪 Test
+    name:  Test
     runs-on: ubuntu-latest
     needs: lint
     services:
@@ -128,7 +128,7 @@ jobs:
 
   # ─── Build & Push Docker Image ───
   docker:
-    name: 🐳 Build & Push Docker
+    name:  Build & Push Docker
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

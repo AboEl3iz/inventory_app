@@ -13,7 +13,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
+import * as encryption from 'src/shared/encryption';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const mockUser = {
@@ -148,6 +148,7 @@ describe('UsersService', () => {
   describe('login()', () => {
     it('should login successfully with valid credentials', async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
+      jest.spyOn(encryption, 'comparePassword').mockResolvedValueOnce(true);
       mockJwtService.sign.mockReturnValue('jwt-token');
       mockAuthRepo.findOne.mockResolvedValue(null);
       mockAuthService.create.mockResolvedValue(mockAuth);
@@ -172,7 +173,7 @@ describe('UsersService', () => {
         where: { email: 'karim@test.com' },
         relations: ['purchases', 'invoices', 'branch'],
       });
-      expect(bcrypt.compare).toHaveBeenCalledWith('123456', 'hashed_pass');
+      expect(encryption.comparePassword).toHaveBeenCalledWith('123456', 'hashed_pass');
       expect(mockJwtService.sign).toHaveBeenCalledTimes(1);
     });
 
@@ -185,9 +186,7 @@ describe('UsersService', () => {
 
     it('should throw error for invalid password', async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
-      jest
-        .spyOn(bcrypt, 'compare')
-        .mockImplementation(jest.fn().mockResolvedValueOnce(false) as any);
+      jest.spyOn(encryption, 'comparePassword').mockResolvedValueOnce(false);
       await expect(
         service.login({ email: 'karim@test.com', password: 'wrongpass' }),
       ).rejects.toThrow(BadRequestException);
@@ -202,6 +201,7 @@ describe('UsersService', () => {
       };
 
       mockUserRepo.findOne.mockResolvedValue(mockUser);
+      jest.spyOn(encryption, 'comparePassword').mockResolvedValueOnce(true);
       mockJwtService.sign.mockReturnValue('jwt-token');
       mockAuthRepo.findOne.mockResolvedValue(existingToken);
       mockAuthService.create.mockResolvedValue(mockAuth);
