@@ -7,6 +7,8 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { MetricsInterceptor } from './common/interceptor/metrics.interceptor';
 
+const START_MODE = process.env.START_MODE || 'api';
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: WinstonModule.createLogger({
@@ -16,7 +18,7 @@ async function bootstrap() {
             winston.format.timestamp(),
             winston.format.colorize({ all: true }),
             winston.format.printf(({ level, message, timestamp }) => {
-              return `[${timestamp}] ${level}: ${message}`;
+              return `[${timestamp}] ${level}: [${START_MODE.toUpperCase()}] ${message}`;
             }),
           ),
         }),
@@ -26,17 +28,44 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // ─── CORS ───
+  // ─── Mode: SCHEDULER ─────────────────────────────────────────────────────
+  // Registers repeatable BullMQ jobs in Redis and stays alive as a lightweight
+  // pod. Exposes a minimal health port so Kubernetes probes keep it running.
+  if (START_MODE === 'scheduler') {
+    // Jobs are registered via SchedulerService.onModuleInit()
+    // We expose a tiny HTTP server for K8s liveness/readiness probes only
+    app.setGlobalPrefix('internal');
+    const port = configService.get<number>('PORT') || 3001;
+    await app.listen(port);
+    Logger.log(
+      `⏰ Scheduler pod running on port ${port} — repeatable jobs registered in Redis`,
+      'Bootstrap',
+    );
+    return;
+  }
+
+  // ─── Mode: WORKER ─────────────────────────────────────────────────────────
+  // Pure BullMQ consumer — no HTTP server, no Swagger, no cron.
+  if (START_MODE === 'worker') {
+    await app.init(); // NestJS context only, no HTTP listener
+    Logger.log(
+      '⚙️  Worker pod started — consuming jobs from Redis queues',
+      'Bootstrap',
+    );
+    return;
+  }
+
+  // ─── Mode: API (default) ──────────────────────────────────────────────────
+  // Full HTTP server with Swagger, CORS, validation, and metrics.
+
   app.enableCors({
     origin: configService.get<string>('CORS_ORIGIN') || '*',
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 
-  // ─── Global Prefix ───
   app.setGlobalPrefix('api/v1');
 
-  // ─── Validation ───
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -45,10 +74,8 @@ async function bootstrap() {
     }),
   );
 
-  // ─── Interceptors ───
   app.useGlobalInterceptors(new MetricsInterceptor());
 
-  // ─── Swagger ───
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Inventory Management System API')
     .setDescription(
@@ -85,10 +112,9 @@ async function bootstrap() {
     SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, documentFactory);
 
-  // ─── Start ───
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
-  Logger.log(`🚀 Application running on port ${port}`, 'Bootstrap');
+  Logger.log(`🚀 API server running on port ${port}`, 'Bootstrap');
 }
 
 bootstrap();

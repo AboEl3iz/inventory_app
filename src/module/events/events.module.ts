@@ -18,14 +18,15 @@ import {
   EMAIL_QUEUE,
 } from '../../shared/event.constants';
 
+const isWorkerMode = process.env.START_MODE === 'worker';
+
 @Module({
   controllers: [EventsController],
   providers: [
     EventsService,
-    StockListener,
-    PuchaseListener,
-    InvoicesListener,
-    EmailProcessor,
+    ...(isWorkerMode
+      ? [StockListener, PuchaseListener, InvoicesListener, EmailProcessor]
+      : []),
   ],
   imports: [
     WinstonModule,

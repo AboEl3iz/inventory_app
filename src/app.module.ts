@@ -7,7 +7,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
 
 // ─── Shared Modules ───
 import { StorageModule } from './shared/storage/storage.module';
@@ -16,6 +15,7 @@ import {
   INVOICES_QUEUE,
   LOW_STOCK_QUEUE,
   EMAIL_QUEUE,
+  SCHEDULER_QUEUE,
 } from './shared/event.constants';
 
 // ─── Feature Modules ───
@@ -24,7 +24,6 @@ import { BranchesModule } from './module/branches/branches.module';
 import { EventsModule } from './module/events/events.module';
 import { StockModule } from './module/stock/stock.module';
 import { SuppliersModule } from './module/suppliers/suppliers.module';
-import { SchedulerModule } from './module/scheduler/scheduler.module';
 import { ReportsModule } from './module/reports/reports.module';
 import { InvoicesModule } from './module/invoices/invoices.module';
 import { PurchasesModule } from './module/purchases/purchases.module';
@@ -35,9 +34,30 @@ import { CategoriesModule } from './module/categories/categories.module';
 import { InventoryModule } from './module/inventory/inventory.module';
 import { MetricsModule } from './module/metrics/metrics.module';
 
+// ─── Mode-specific modules ───
+import { SchedulerModule } from './module/scheduler/scheduler.module';
+import { JobsModule } from './module/jobs/jobs.module';
+
 // ─── Logging ───
 import { WinstonModule } from 'nest-winston';
 import * as winston from 'winston';
+
+/**
+ * START_MODE controls which role this pod plays:
+ *
+ *  - "api"       → HTTP server only. No queue workers, no cron scheduling.
+ *  - "worker"    → Processes jobs from Redis queues (BullMQ @Processor).
+ *                  No HTTP routes, no scheduling.
+ *  - "scheduler" → Registers BullMQ repeatable jobs in Redis at startup.
+ *                  No HTTP routes (except a health port), no workers.
+ *
+ * This prevents any duplicate cron execution across replicas.
+ */
+const START_MODE = process.env.START_MODE || 'api';
+
+const isApi = START_MODE === 'api';
+const isWorker = START_MODE === 'worker';
+const isScheduler = START_MODE === 'scheduler';
 
 @Module({
   imports: [
@@ -58,17 +78,21 @@ import * as winston from 'winston';
       ],
     }),
 
-    // ─── Queue (BullMQ / Redis) ───
+    // ─── Queue (BullMQ / Redis) — always registered so producers and
+    //     consumers can reference queues regardless of mode ───
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         connection: {
           host: configService.get<string>('REDIS_HOST') || 'localhost',
           port: configService.get<number>('REDIS_PORT') || 6379,
+          password: configService.get<string>('REDIS_PASSWORD') || undefined,
         },
         defaultJobOptions: {
           attempts: 3,
           backoff: { type: 'exponential', delay: 1000 },
+          removeOnComplete: { count: 50 },
+          removeOnFail: { count: 100 },
         },
       }),
       inject: [ConfigService],
@@ -78,6 +102,7 @@ import * as winston from 'winston';
       { name: INVOICES_QUEUE },
       { name: LOW_STOCK_QUEUE },
       { name: EMAIL_QUEUE },
+      { name: SCHEDULER_QUEUE },
     ),
 
     // ─── Storage (Cloudinary / S3) ───
@@ -85,9 +110,6 @@ import * as winston from 'winston';
 
     // ─── Events ───
     EventEmitterModule.forRoot(),
-
-    // ─── Scheduler ───
-    ScheduleModule.forRoot(),
 
     // ─── Cache ───
     CacheModule.register({ ttl: 300, isGlobal: true }),
@@ -100,24 +122,33 @@ import * as winston from 'winston';
       inject: [ConfigService],
     }),
 
-    // ─── Feature Modules ───
-    ProductsModule,
-    BranchesModule,
-    EventsModule,
-    StockModule,
-    SuppliersModule,
-    SchedulerModule,
-    ReportsModule,
-    InvoicesModule,
-    PurchasesModule,
-    AnalyticsModule,
-    AuthModule,
-    UsersModule,
-    CategoriesModule,
-    InventoryModule,
-    MetricsModule,
+    // ─── API-only feature modules ───
+    ...(isApi || isWorker
+      ? [
+          ProductsModule,
+          BranchesModule,
+          StockModule,
+          SuppliersModule,
+          ReportsModule,
+          InvoicesModule,
+          PurchasesModule,
+          AnalyticsModule,
+          AuthModule,
+          UsersModule,
+          CategoriesModule,
+          InventoryModule,
+          MetricsModule,
+          EventsModule,
+        ]
+      : []),
+
+    // ─── Scheduler: registers repeatable jobs in Redis ───
+    ...(isScheduler ? [SchedulerModule] : []),
+
+    // ─── Worker: BullMQ @Processor classes ───
+    ...(isWorker ? [JobsModule] : []),
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [...(isApi ? [AppController] : [])],
+  providers: [...(isApi ? [AppService] : [])],
 })
 export class AppModule {}

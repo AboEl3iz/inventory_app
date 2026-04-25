@@ -1,24 +1,26 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
+import { Controller, Delete, Get, Param } from '@nestjs/common';
 import { SchedulerService } from './scheduler.service';
-import { CreateSchedulerDto } from './dto/create-scheduler.dto';
-import { UpdateSchedulerDto } from './dto/update-scheduler.dto';
-import { NotificationService } from './notification.service';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+/**
+ * Scheduler admin endpoints — view and manage BullMQ repeatable jobs.
+ * Only available on the scheduler pod; API pods do not load SchedulerModule.
+ */
 @Controller('scheduler')
 @ApiTags('Scheduler')
 @ApiBearerAuth('access-token')
 export class SchedulerController {
-  constructor(
-    private readonly schedulerService: SchedulerService,
-    private readonly notificationService: NotificationService,
-  ) {}
+  constructor(private readonly schedulerService: SchedulerService) {}
+
+  @Get('jobs')
+  @ApiOperation({ summary: 'List all active repeatable jobs in Redis' })
+  getRepeatableJobs() {
+    return this.schedulerService.getRepeatableJobs();
+  }
+
+  @Delete('jobs/:name')
+  @ApiOperation({ summary: 'Remove a repeatable job by name' })
+  removeRepeatableJob(@Param('name') name: string) {
+    return this.schedulerService.removeRepeatableJob(name);
+  }
 }

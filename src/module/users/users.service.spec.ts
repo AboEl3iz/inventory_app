@@ -173,7 +173,10 @@ describe('UsersService', () => {
         where: { email: 'karim@test.com' },
         relations: ['purchases', 'invoices', 'branch'],
       });
-      expect(encryption.comparePassword).toHaveBeenCalledWith('123456', 'hashed_pass');
+      expect(encryption.comparePassword).toHaveBeenCalledWith(
+        '123456',
+        'hashed_pass',
+      );
       expect(mockJwtService.sign).toHaveBeenCalledTimes(1);
     });
 
