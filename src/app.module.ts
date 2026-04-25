@@ -126,6 +126,7 @@ const isScheduler = START_MODE === 'scheduler';
     // ⚠️  Never load these in worker/scheduler mode.
     //     ProductsModule creates Multer DiskStorage at module-init time which
     //     calls mkdirSync — this crashes when readOnlyRootFilesystem=true.
+    //     InventoryModule has AuthenticationGuard → needs JwtService (AuthModule)
     ...(isApi
       ? [
           ProductsModule,   // ← has Multer DiskStorage — API only
@@ -139,22 +140,20 @@ const isScheduler = START_MODE === 'scheduler';
           UsersModule,
           CategoriesModule,
           MetricsModule,
+          InventoryModule,  // ← has AuthenticationGuard — API only
         ]
       : []),
 
-    // ─── Shared DB modules needed by both API and Worker ─────────────────────
-    // InventoryModule and ReportsModule are imported by EventsModule / JobsModule
-    // but also needed explicitly so their services are resolvable in the DI tree.
-    ...(isApi || isWorker
-      ? [
-          InventoryModule,  // ← required by EventsModule (InvoicesListener)
-          ReportsModule,    // ← required by JobsModule processors
-        ]
-      : []),
+    // ─── Shared DB modules needed by Worker only ──────────────────────────────
+    // ReportsModule is used directly by JobsModule processors.
+    // InventoryModule is intentionally NOT listed here — workers get InventoryService
+    // through EventsModule's internal import, avoiding the AuthenticationGuard
+    // DI issue that occurs when InventoryModule is loaded without AuthModule.
+    ...(isWorker ? [ReportsModule] : []),
 
     // ─── Worker queue processors (BullMQ listeners) ───────────────────────────
     // EventsModule: handles INVOICES_QUEUE, PURCHASES_QUEUE, LOW_STOCK_QUEUE,
-    //               EMAIL_QUEUE processors (InvoicesListener, etc.)
+    //               EMAIL_QUEUE processors — internally imports InventoryModule
     // JobsModule:   handles SCHEDULER_QUEUE processors (reports, cleanup, etc.)
     ...(isWorker ? [EventsModule, JobsModule] : []),
 
