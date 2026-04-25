@@ -122,31 +122,47 @@ const isScheduler = START_MODE === 'scheduler';
       inject: [ConfigService],
     }),
 
-    // ─── API-only feature modules ───
-    ...(isApi || isWorker
+    // ─── API-only modules (HTTP controllers, Multer, Auth, etc.) ────────────
+    // ⚠️  Never load these in worker/scheduler mode.
+    //     ProductsModule creates Multer DiskStorage at module-init time which
+    //     calls mkdirSync — this crashes when readOnlyRootFilesystem=true.
+    ...(isApi
       ? [
-          ProductsModule,
+          ProductsModule,   // ← has Multer DiskStorage — API only
           BranchesModule,
           StockModule,
           SuppliersModule,
-          ReportsModule,
           InvoicesModule,
           PurchasesModule,
           AnalyticsModule,
           AuthModule,
           UsersModule,
           CategoriesModule,
-          InventoryModule,
           MetricsModule,
-          EventsModule,
         ]
       : []),
 
-    // ─── Scheduler: registers repeatable jobs in Redis ───
+    // ─── Shared DB modules needed by both API and Worker ─────────────────────
+    // InventoryModule and ReportsModule are imported by EventsModule / JobsModule
+    // but also needed explicitly so their services are resolvable in the DI tree.
+    ...(isApi || isWorker
+      ? [
+          InventoryModule,  // ← required by EventsModule (InvoicesListener)
+          ReportsModule,    // ← required by JobsModule processors
+        ]
+      : []),
+
+    // ─── Worker queue processors (BullMQ listeners) ───────────────────────────
+    // EventsModule: handles INVOICES_QUEUE, PURCHASES_QUEUE, LOW_STOCK_QUEUE,
+    //               EMAIL_QUEUE processors (InvoicesListener, etc.)
+    // JobsModule:   handles SCHEDULER_QUEUE processors (reports, cleanup, etc.)
+    ...(isWorker ? [EventsModule, JobsModule] : []),
+
+    // ─── Scheduler: registers repeatable jobs in Redis once at startup ────────
     ...(isScheduler ? [SchedulerModule] : []),
 
-    // ─── Worker: BullMQ @Processor classes ───
-    ...(isWorker ? [JobsModule] : []),
+    // ─── API: load EventsModule for event-emitter listeners on API pods ───────
+    ...(isApi ? [EventsModule] : []),
   ],
   controllers: [...(isApi ? [AppController] : [])],
   providers: [...(isApi ? [AppService] : [])],
