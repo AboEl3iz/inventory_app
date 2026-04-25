@@ -18,16 +18,16 @@ on:
   pull_request:
     branches: [ master ]
 
-# ─── Limit permissions to principle of least privilege ───────────────────────
-permissions:
-  contents: read
-  packages: write # needed to push to GHCR if ever switched from DockerHub
-  security-events: write #
+# # ─── Limit permissions to principle of least privilege ───────────────────────
+# permissions:
+#   contents: read
+#   packages: write # needed to push to GHCR if ever switched from DockerHub
+#   security-events: write #
 
-# ─── Cancel redundant runs on the same branch/PR ────────────────────────────
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# # ─── Cancel redundant runs on the same branch/PR ────────────────────────────
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
 env:
   NODE_VERSION: "20"
