@@ -51,12 +51,10 @@ const isWorkerMode = process.env.START_MODE === 'worker';
 
   imports: [
     WinstonModule,
-    // ─── InventoryModule: API only ───────────────────────────────────────────
-    // InventoryModule registers InventoryController which uses AuthenticationGuard.
-    // In worker mode this guard can't be resolved (no AuthModule → no JwtService).
-    // Workers that need InventoryService should import it directly via JobsModule
-    // or have the entity repos registered through TypeOrmModule.forFeature.
-    ...(!isWorkerMode ? [InventoryModule] : []),
+    // InventoryModule now gates its own controller (API mode only),
+    // so it is safe to import in all modes. Workers get InventoryService
+    // here for StockListener, InvoicesListener, etc.
+    InventoryModule,
     TypeOrmModule.forFeature([Event, ProductVariant]),
     BullModule.registerQueue({ name: PURCHASES_QUEUE }),
     BullModule.registerQueue({ name: INVOICES_QUEUE }),
