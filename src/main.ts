@@ -32,9 +32,16 @@ async function bootstrap() {
   // Registers repeatable BullMQ jobs in Redis and stays alive as a lightweight
   // pod. Exposes a minimal health port so Kubernetes probes keep it running.
   if (START_MODE === 'scheduler') {
-    // Jobs are registered via SchedulerService.onModuleInit()
-    // We expose a tiny HTTP server for K8s liveness/readiness probes only
     app.setGlobalPrefix('internal');
+
+    // ─── Health endpoint for K8s liveness/readiness probes ────────────────
+    // Route: GET /internal/health  (matches the probe path in 04-cronjob.yaml)
+    // Registered via raw Express middleware so it works with any NestJS modules.
+    const httpAdapter = app.getHttpAdapter();
+    httpAdapter.get('/internal/health', (_req: any, res: any) => {
+      res.status(200).json({ status: 'ok', mode: 'scheduler' });
+    });
+
     const port = configService.get<number>('PORT') || 3001;
     await app.listen(port);
     Logger.log(
@@ -65,6 +72,14 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api/v1');
+
+  // ─── Health endpoint for K8s liveness/readiness/startup probes ────────────
+  // Route: GET /api/v1/health  (matches probe path in 02-api.yaml)
+  // Must be registered AFTER setGlobalPrefix so the prefix is applied.
+  const httpAdapter = app.getHttpAdapter();
+  httpAdapter.get('/api/v1/health', (_req: any, res: any) => {
+    res.status(200).json({ status: 'ok', mode: 'api' });
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
