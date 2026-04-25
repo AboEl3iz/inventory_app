@@ -7,22 +7,22 @@
 #
 # Flow:
 #   • Every push / PR → lint + security + test
-#   • Push to main only → build & push Docker image
+#   • Push to master only → build & push Docker image
 # ============================================
 
 name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [ master ]
   pull_request:
-    branches: [main]
+    branches: [ master ]
 
 # ─── Limit permissions to principle of least privilege ───────────────────────
 permissions:
   contents: read
-  packages: write       # needed to push to GHCR if ever switched from DockerHub
-  security-events: write # needed for Trivy SARIF upload
+  packages: write # needed to push to GHCR if ever switched from DockerHub
+  security-events: write #
 
 # ─── Cancel redundant runs on the same branch/PR ────────────────────────────
 concurrency:
@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: "20"
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/inventory-app
 
 # ─── Shared test environment variables ──────────────────────────────────────
@@ -53,7 +53,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -72,7 +72,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # full history required for Gitleaks
+          fetch-depth: 0 # full history required for Gitleaks
 
       # Secret scanning — MUST block on secrets in code, never continue-on-error
       - name: Secret Scanning (Gitleaks)
@@ -81,37 +81,37 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # continue-on-error removed intentionally: secrets in code = hard fail
 
-      # Dependency & filesystem vulnerability scan
-      # exit-code: '1' ensures HIGH/CRITICAL vulns fail the build
+        # Dependency & filesystem vulnerability scan
+        # exit-code: '1' ensures HIGH/CRITICAL vulns fail the build
       - name: Dependency Scanning (Trivy SCA)
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          exit-code: '1'          # fail on HIGH/CRITICAL — was '0' (silent pass)
-          severity: 'HIGH,CRITICAL'
-          scanners: 'vuln,secret,config'
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+          exit-code: "1" # fail on HIGH/CRITICAL — was '0' (silent pass)
+          severity: "HIGH,CRITICAL"
+          scanners: "vuln,secret,config"
 
       - name: Upload Trivy SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always()   # upload even on failure so results are visible
+        if: always() # upload even on failure so results are visible
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: "trivy-results.sarif"
 
       # SAST — pinned to a specific release tag, not @master (supply-chain safety)
       - name: SAST (njsscan)
         uses: ajinabraham/njsscan-action@v7
         with:
-          args: '. --exit-warning'
-        continue-on-error: true   # SAST findings are advisory, not blocking yet
+          args: ". --exit-warning"
+        continue-on-error: true # SAST findings are advisory, not blocking yet
 
   # ─── Test ──────────────────────────────────────────────────────────────────
   test:
     name: Test
     runs-on: ubuntu-latest
-    needs: [lint, security]
+    needs: [ lint, security ]
 
     # Service containers — started before steps
     services:
@@ -125,18 +125,14 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U admin -d inventory_app_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-interval 10s --health-timeout 5s --health-retries 5
 
       redis:
         image: redis:7-alpine
         # Start Redis with a password to match the app's BullMQ configuration
         options: >-
-          --health-cmd "redis-cli -a testpass ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-cmd "redis-cli -a testpass ping" --health-interval 10s
+          --health-timeout 5s --health-retries 5
         ports:
           - 6379:6379
 
@@ -147,11 +143,11 @@ jobs:
       DB_PORT: 5432
       DB_USERNAME: admin
       DB_PASSWORD: admin
-      DB_DATABASE: inventory_app_test   # fixed: was DB_NAME, app reads DB_DATABASE
+      DB_DATABASE: inventory_app_test # fixed: was DB_NAME, app reads DB_DATABASE
       DB_TYPE: postgres
       REDIS_HOST: localhost
       REDIS_PORT: 6379
-      REDIS_PASSWORD: testpass          # added: app now requires Redis auth
+      REDIS_PASSWORD: testpass # added: app now requires Redis auth
       JWT_SECRET: test_jwt_secret_ci
       JWT_EXPIRES_IN: 3600s
 
@@ -163,7 +159,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -185,8 +181,8 @@ jobs:
     name: Build & Push Docker
     runs-on: ubuntu-latest
     needs: test
-    # Only deploy on pushes to main — not on PRs
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Only deploy on pushes to master — not on PRs
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -219,7 +215,7 @@ jobs:
             # Semantic version tag when you push a git tag like v1.2.3
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            # latest always points to the most recent main build
+            # latest always points to the most recent master build
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
