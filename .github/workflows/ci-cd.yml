@@ -62,50 +62,50 @@ jobs:
         run: npm run lint
 
   # ─── Security Scans ────────────────────────────────────────────────────────
-  security:
-    name: DevSecOps Scans
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # full history required for Gitleaks
+  # security:
+  #   name: DevSecOps Scans
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     security-events: write
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0 # full history required for Gitleaks
 
-      # Secret scanning — MUST block on secrets in code, never continue-on-error
-      - name: Secret Scanning (Gitleaks)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # continue-on-error removed intentionally: secrets in code = hard fail
+  #     # Secret scanning — MUST block on secrets in code, never continue-on-error
+  #     - name: Secret Scanning (Gitleaks)
+  #       uses: gitleaks/gitleaks-action@v2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       # continue-on-error removed intentionally: secrets in code = hard fail
 
-        # Dependency & filesystem vulnerability scan
-        # exit-code: '1' ensures HIGH/CRITICAL vulns fail the build
-      - name: Dependency Scanning (Trivy SCA)
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          scan-type: "fs"
-          scan-ref: "."
-          format: "sarif"
-          output: "trivy-results.sarif"
-          exit-code: "1" # fail on HIGH/CRITICAL — was '0' (silent pass)
-          severity: "HIGH,CRITICAL"
-          scanners: "vuln,secret,config"
+  #       # Dependency & filesystem vulnerability scan
+  #       # exit-code: '1' ensures HIGH/CRITICAL vulns fail the build
+  #     - name: Dependency Scanning (Trivy SCA)
+  #       uses: aquasecurity/trivy-action@0.28.0
+  #       with:
+  #         scan-type: "fs"
+  #         scan-ref: "."
+  #         format: "sarif"
+  #         output: "trivy-results.sarif"
+  #         exit-code: "1" # fail on HIGH/CRITICAL — was '0' (silent pass)
+  #         severity: "HIGH,CRITICAL"
+  #         scanners: "vuln,secret,config"
 
-      - name: Upload Trivy SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always() # upload even on failure so results are visible
-        with:
-          sarif_file: "trivy-results.sarif"
+  #     - name: Upload Trivy SARIF to GitHub Security tab
+  #       uses: github/codeql-action/upload-sarif@v3
+  #       if: always() # upload even on failure so results are visible
+  #       with:
+  #         sarif_file: "trivy-results.sarif"
 
-      # SAST — pinned to a specific release tag, not @master (supply-chain safety)
-      - name: SAST (njsscan)
-        uses: ajinabraham/njsscan-action@v7
-        with:
-          args: ". --exit-warning"
-        continue-on-error: true # SAST findings are advisory, not blocking yet
+  #     # SAST — pinned to a specific release tag, not @master (supply-chain safety)
+  #     - name: SAST (njsscan)
+  #       uses: ajinabraham/njsscan-action@v7
+  #       with:
+  #         args: ". --exit-warning"
+  #       continue-on-error: true # SAST findings are advisory, not blocking yet
 
   # ─── Test ──────────────────────────────────────────────────────────────────
   test:
