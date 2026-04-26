@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-app-api
+  namespace: inventory
+  labels:
+    app: inventory-app-api
+    role: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-app-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: inventory-app-api
+        role: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Graceful shutdown: give the API time to drain in-flight requests
+      terminationGracePeriodSeconds: 30
+      # Spread pods across nodes for high availability
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: inventory-app-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: aboelaiz/inventory-app:latest # REPLACE WITH YOUR IMAGE
+          imagePullPolicy: Always
+          command: ["node", "dist/main"]
+          envFrom:
+            - configMapRef:
+                name: inventory-app-config
+            - secretRef:
+                name: inventory-app-secret
+          env:
+            # START_MODE=api → HTTP server only. No BullMQ workers, no cron.
+            - name: START_MODE
+              value: "api"
+          ports:
+            - containerPort: 3000
+              name: http
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # startupProbe: gives the app up to 60s (6 × 10s) to become ready
+          # before liveness kicks in — prevents false restarts on slow boot
+          startupProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 6
+          # livenessProbe: restart the pod if it deadlocks / hangs
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # readinessProbe: stop routing traffic if the pod isn't ready
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: http
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: uploads
+              mountPath: /app/uploads   # Multer DiskStorage writes here
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: uploads
+          emptyDir: {}   # Ephemeral — use a PVC or cloud storage (S3/Cloudinary) in production
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-app-api
+  namespace: inventory
+  labels:
+    app: inventory-app-api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 3000
+      name: http
+  selector:
+    app: inventory-app-api
+---
+# Ensures at least 1 API replica is available during node maintenance
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inventory-app-api-pdb
+  namespace: inventory
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: inventory-app-api
+---
+# HPA: scale API pods based on CPU utilization
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: inventory-app-api-hpa
+  namespace: inventory
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: inventory-app-api
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

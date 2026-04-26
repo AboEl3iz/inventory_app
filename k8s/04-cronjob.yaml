@@ -1,0 +1,120 @@
+##############################################################################
+# 04-scheduler.yaml
+#
+# Dedicated scheduler pod — registers BullMQ repeatable jobs in Redis.
+#
+# KEY INVARIANTS:
+#   - replicas: 1     → only one scheduler runs at a time
+#   - strategy: Recreate → prevents two schedulers briefly overlapping
+#   - START_MODE=scheduler → loads SchedulerModule (producer only)
+#   - Deterministic jobId ("repeatable:<name>") makes re-registration safe
+#   - PodDisruptionBudget minAvailable: 1 keeps it alive during node drains
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-app-scheduler
+  namespace: inventory
+  labels:
+    app: inventory-app-scheduler
+    role: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-app-scheduler
+  # Recreate: terminate the old pod before starting the new one.
+  # Ensures only one scheduler ever runs, even during rollouts.
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: inventory-app-scheduler
+        role: scheduler
+    spec:
+      terminationGracePeriodSeconds: 15
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: scheduler
+          image: aboelaiz/inventory-app:latest
+          imagePullPolicy: Always
+          command: ["node", "dist/main"]
+          envFrom:
+            - configMapRef:
+                name: inventory-app-config
+            - secretRef:
+                name: inventory-app-secret
+          env:
+            - name: START_MODE
+              value: "scheduler"
+            # Scheduler exposes a health port on 3001 to avoid conflict with
+            # the API port (3000 in ConfigMap). This is an override.
+            - name: PORT
+              value: "3001"
+          ports:
+            - containerPort: 3001
+              name: health
+          # startupProbe: allow up to 30s for Redis connection + job registration
+          startupProbe:
+            httpGet:
+              path: /internal/health
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 6
+          # livenessProbe: restart if the process hangs
+          livenessProbe:
+            httpGet:
+              path: /internal/health
+              port: health
+            periodSeconds: 30
+            failureThreshold: 3
+          # readinessProbe: confirm jobs are registered before marking ready
+          readinessProbe:
+            httpGet:
+              path: /internal/health
+              port: health
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            # Same workaround as worker: remove once image is rebuilt
+            - name: uploads
+              mountPath: /app/uploads
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: uploads
+          emptyDir: {}
+---
+# Ensure the scheduler pod is not evicted during node maintenance.
+# minAvailable: 1 forces Kubernetes to reschedule it before draining.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inventory-app-scheduler-pdb
+  namespace: inventory
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: inventory-app-scheduler

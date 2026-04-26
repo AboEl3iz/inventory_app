@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - 00-namespace.yaml
+  - 01-config.yaml
+  - 02-api.yaml
+  - 03-worker.yaml
+  - 04-cronjob.yaml
+  - 05-ingress.yaml
+  - 06-postgres.yaml
+  - 07-redis.yaml
+  - 08-dashboards.yaml
+
+# ── Image Tag Override ───────────────────────────────────────────────────
+# Jenkins will sed this file and replace newTag with the built image tag.
+# Kustomize will automatically find any deployment/pod using 'aboelaiz/inventory-app' 
+# (even if it has ':latest' in the manifest) and replace its tag.
+images:
+  - name: aboelaiz/inventory-app
+    newTag: "latest"

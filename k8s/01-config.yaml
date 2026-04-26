@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-app-config
+  namespace: inventory
+  labels:
+    app: inventory-app
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # ─── Email ───────────────────────────────────────────────────────────────────
+  EMAIL_HOST: "mailpit"       # Replace with real SMTP host in production
+  EMAIL_PORT: "1025"
+  EMAIL_SECURE: "false"
+---
+# ─── Secrets ─────────────────────────────────────────────────────────────────
+# WARNING: In production, use a Secret Manager (AWS Secrets Manager, HashiCorp
+# Vault, or Sealed Secrets) instead of plaintext stringData.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: inventory-app-secret
+  namespace: inventory
+  labels:
+    app: inventory-app
+type: Opaque
+stringData:
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_USERNAME: "admin"
+  DB_PASSWORD: "admin"
+  DB_DATABASE: "inventory_app"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: "redis-super-secret-password"
+  EMAIL_USER: "smtp-user"
+  EMAIL_PASS: "smtp-password"
+  # pgAdmin dashboard credentials (used only by 08-dashboards.yaml)
+  PGADMIN_EMAIL: "admin@inventory.local"
+  PGADMIN_PASSWORD: "change-me-in-production"

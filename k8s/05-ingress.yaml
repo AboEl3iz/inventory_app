@@ -1,0 +1,63 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inventory-app-ingress
+  namespace: inventory
+  annotations:
+    # ─── TLS / cert-manager ──────────────────────────────────────────────────
+    # Uncomment when cert-manager is installed:
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    # ─── NGINX tuning ────────────────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+
+    # ─── Rate limiting (per IP) ───────────────────────────────────────────────
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+spec:
+  # ingressClassName replaces the deprecated kubernetes.io/ingress.class annotation
+  ingressClassName: nginx
+
+  # ─── TLS ─────────────────────────────────────────────────────────────────
+  # Uncomment and fill in when you have a TLS certificate:
+  # tls:
+  #   - hosts:
+  #       - api.yourdomain.com
+  #     secretName: inventory-app-tls
+
+  rules:
+    - host: api.yourdomain.com           # REPLACE with your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-app-api
+                port:
+                  number: 80
+
+    - host: pgadmin.yourdomain.com       # REPLACE with your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pgadmin
+                port:
+                  number: 80
+
+    - host: redisinsight.yourdomain.com  # REPLACE with your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: redisinsight
+                port:
+                  number: 5540

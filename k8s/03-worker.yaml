@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-app-worker
+  namespace: inventory
+  labels:
+    app: inventory-app-worker
+    role: worker
+spec:
+  # HPA controls replica count — do not set replicas here to avoid drift.
+  # Set replicas only if HPA is disabled.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-app-worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: inventory-app-worker
+        role: worker
+    spec:
+      # BullMQ needs time to finish the current job before shutdown.
+      # Set this to slightly longer than your longest expected job duration.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: aboelaiz/inventory-app:latest
+          imagePullPolicy: Always
+          command: ["node", "dist/main"]
+          envFrom:
+            - configMapRef:
+                name: inventory-app-config
+            - secretRef:
+                name: inventory-app-secret
+          env:
+            # START_MODE=worker → BullMQ @Processor consumers only.
+            # No HTTP server, no cron scheduling. Scales independently.
+            - name: START_MODE
+              value: "worker"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          # Workers have no HTTP port, so we use a process-level liveness check.
+          # This detects a completely dead/zombie process.
+          livenessProbe:
+            exec:
+              command: ["node", "-e", "process.exit(0)"]
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            failureThreshold: 3
+          # Readiness: worker is ready once it has connected to Redis.
+          # Use the same exec probe — BullMQ throws on init if Redis is down.
+          readinessProbe:
+            exec:
+              command: ["node", "-e", "process.exit(0)"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            # Temporary workaround: old image loads ProductsModule on workers
+            # which triggers Multer mkdirSync at init time. Remove once image
+            # is rebuilt with the app.module.ts START_MODE fix.
+            - name: uploads
+              mountPath: /app/uploads
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: uploads
+          emptyDir: {}
+---
+# Ensures at least 1 worker stays up during node drains so no jobs are lost
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inventory-app-worker-pdb
+  namespace: inventory
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: inventory-app-worker
+---
+# Scale workers based on CPU. For production, replace with KEDA
+# ExternalScaler using BullMQ queue depth for more accurate scaling.
+# Reference: https://keda.sh/docs/scalers/redis-lists/
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: inventory-app-worker-hpa
+  namespace: inventory
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: inventory-app-worker
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
