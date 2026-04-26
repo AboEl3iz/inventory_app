@@ -24,6 +24,7 @@ jenkins:
     loggedInUsersCanDoAnything:
       allowAnonymousRead: false
 
+
   # ── Agents ────────────────────────────────────────────────────────────
   numExecutors: 4
   mode: NORMAL
@@ -97,40 +98,4 @@ credentials:
               secret: "${SLACK_WEBHOOK_URL}"
 
 # ── Seed Job — creates the pipeline via Job DSL ──────────────────────────
-jobs:
-  - script: |
-      pipelineJob('inventory-app-ci') {
-        displayName('Inventory App — CI Pipeline')
-        description('DevSecOps pipeline: Test → SAST → Build → Scan → Push → GitOps')
-
-        properties {
-          buildDiscarder {
-            strategy {
-              logRotator {
-                numToKeepStr('10')
-                artifactNumToKeepStr('5')
-              }
-            }
-          }
-        }
-
-        definition {
-          cpsScm {
-            scm {
-              git {
-                remote {
-                  url('https://github.com/YOUR_ORG/inventory_app.git')
-                  credentials('github-credentials')
-                }
-                branches('*/main')
-              }
-            }
-            scriptPath('Jenkinsfile')
-            lightweight(true)
-          }
-        }
-
-        triggers {
-          githubPush()
-        }
-      }
+# Job DSL removed to prevent startup hangs. Please create the pipeline manually in the UI.

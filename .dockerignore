@@ -11,3 +11,7 @@ coverage
 data
 uploads
 postgres_data
+argocd
+docs
+jenkins
+k8s

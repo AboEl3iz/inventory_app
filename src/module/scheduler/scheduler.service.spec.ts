@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bullmq';
 import { SchedulerService } from './scheduler.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Inventory } from '../inventory/entities/inventory.entity';
@@ -70,6 +71,13 @@ describe('SchedulerService', () => {
             getCronJobs: jest.fn().mockReturnValue(new Map()),
             addCronJob: jest.fn(),
             deleteCronJob: jest.fn(),
+          },
+        },
+        {
+          provide: getQueueToken('SCHEDULER_QUEUE'),
+          useValue: {
+            add: jest.fn(),
+            process: jest.fn(),
           },
         },
       ],

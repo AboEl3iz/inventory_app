@@ -7,7 +7,6 @@
 workflow-aggregator:latest
 pipeline-stage-view:latest
 pipeline-graph-analysis:latest
-blueocean:latest
 
 # ── SCM ──────────────────────────────────────────────────────────────────
 git:latest
