@@ -1,0 +1,136 @@
+# ============================================================
+# DevSecOps Local Stack
+# Services: Jenkins · SonarQube · PostgreSQL (for Sonar) · sonar-init
+# ============================================================
+version: '3.8'
+
+networks:
+  devsecops:
+    driver: bridge
+
+volumes:
+  jenkins_home:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+  sonarqube_db:
+  sonar_token:          # shared volume — sonar-init writes, jenkins reads
+
+services:
+
+  # ── SonarQube Database ──────────────────────────────────────────────────
+  sonar-db:
+    image: postgres:15-alpine
+    container_name: sonar-db
+    restart: unless-stopped
+    networks: [devsecops]
+    environment:
+      POSTGRES_DB:       sonarqube
+      POSTGRES_USER:     sonar
+      POSTGRES_PASSWORD: sonar_password
+    volumes:
+      - sonarqube_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── SonarQube Community ─────────────────────────────────────────────────
+  sonarqube:
+    image: sonarqube:10-community
+    container_name: sonarqube
+    restart: unless-stopped
+    networks: [devsecops]
+    ports:
+      - "9000:9000"
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL:      jdbc:postgresql://sonar-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar_password
+      # Disable ES bootstrap checks for local single-node usage
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+
+  # ── SonarQube Token Generator ───────────────────────────────────────────
+  # Runs ONCE after SonarQube is healthy.
+  # Changes admin password, creates a project, generates a CI token,
+  # and writes it to the shared sonar_token volume for Jenkins to read.
+  sonar-init:
+    image: curlimages/curl:8.7.1
+    container_name: sonar-init
+    user: root
+    restart: "no"
+    networks: [devsecops]
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    volumes:
+      - sonar_token:/sonar-token
+      - ./scripts/generate-sonar-token.sh:/generate-sonar-token.sh:ro
+    entrypoint: ["/bin/sh", "/generate-sonar-token.sh"]
+    environment:
+      SONAR_URL:           http://sonarqube:9000
+      SONAR_ADMIN_PASSWORD: Admin@1234          # Change in production
+      SONAR_PROJECT_KEY:   inventory-app
+      SONAR_PROJECT_NAME:  "Inventory App"
+
+  # ── Jenkins ─────────────────────────────────────────────────────────────
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
+    container_name: jenkins
+    restart: unless-stopped
+    # Run as root so Jenkins can use the Docker socket.
+    # The jenkins-init.sh script drops back to 'jenkins' user after boot.
+    user: root
+    networks: [devsecops]
+    ports:
+      - "8080:8080"       # Jenkins UI
+      - "50000:50000"     # JNLP agent port
+    depends_on:
+      sonar-init:
+        condition: service_completed_successfully
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock   # Docker-in-Docker (socket)
+      - ./casc:/var/jenkins_home/casc_configs:ro    # JCasC config dir
+      - sonar_token:/sonar-token:ro                 # Read SonarQube token
+    environment:
+      # ── Jenkins bootstrap ──────────────────────────────────────────────
+      JAVA_OPTS:            "-Djenkins.install.runSetupWizard=false"
+      CASC_JENKINS_CONFIG:  /var/jenkins_home/casc_configs
+
+      # ── Credentials injected into JCasC ──────────────────────────────
+      JENKINS_ADMIN_PASSWORD: Admin@Jenkins2024
+
+      # DockerHub
+      DOCKERHUB_USERNAME:  ${DOCKERHUB_USERNAME}
+      DOCKERHUB_PASSWORD:  ${DOCKERHUB_PASSWORD}
+
+      # GitHub
+      GITHUB_USERNAME:  ${GITHUB_USERNAME}
+      GITHUB_TOKEN:     ${GITHUB_TOKEN}
+
+      # Slack
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
+
+      # SonarQube
+      SONARQUBE_URL: http://sonarqube:9000

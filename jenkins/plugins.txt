@@ -1,0 +1,56 @@
+# ============================================================
+# Jenkins Plugins — DevSecOps Pipeline
+# Install via: jenkins-plugin-cli --plugin-file plugins.txt
+# ============================================================
+
+# ── Core Pipeline ────────────────────────────────────────────────────────
+workflow-aggregator:latest
+pipeline-stage-view:latest
+pipeline-graph-analysis:latest
+blueocean:latest
+
+# ── SCM ──────────────────────────────────────────────────────────────────
+git:latest
+github:latest
+github-branch-source:latest
+
+# ── Credentials & Security ───────────────────────────────────────────────
+credentials:latest
+credentials-binding:latest
+plain-credentials:latest
+ssh-credentials:latest
+mask-passwords:latest
+
+# ── Docker ────────────────────────────────────────────────────────────────
+docker-workflow:latest
+docker-commons:latest
+
+# ── SonarQube ────────────────────────────────────────────────────────────
+sonar:latest
+
+# ── Slack Notifications ───────────────────────────────────────────────────
+slack:latest
+
+# ── Configuration as Code (JCasC) ────────────────────────────────────────
+configuration-as-code:latest
+
+# ── Testing & Reports ─────────────────────────────────────────────────────
+junit:latest
+htmlpublisher:latest
+warnings-ng:latest
+coverage:latest
+
+# ── Timestamps & ANSI colors ──────────────────────────────────────────────
+timestamper:latest
+ansicolor:latest
+
+# ── Workspace cleanup ────────────────────────────────────────────────────
+ws-cleanup:latest
+
+# ── Build Tools ──────────────────────────────────────────────────────────
+nodejs:latest
+
+# ── Utility ──────────────────────────────────────────────────────────────
+build-timeout:latest
+lockable-resources:latest
+job-dsl:latest
