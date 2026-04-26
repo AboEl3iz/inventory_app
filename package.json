@@ -112,6 +112,11 @@
     "coverageDirectory": "./coverage",
     "transformIgnorePatterns": [
       "node_modules/(?!uuid)"
+    ],
+    "coverageReporters": [
+      "lcov",
+      "text",
+      "clover"
     ]
   }
 }
