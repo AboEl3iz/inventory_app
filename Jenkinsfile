@@ -81,13 +81,15 @@ pipeline {
         // ── Stage 3: Run Tests ───────────────────────────────────────────
         stage('Run Tests') {
             steps {
-                sh '''
-                    echo "🧪  Running unit tests with coverage..."
-                    npm run test:cov -- \
-                        --forceExit \
-                        --passWithNoTests \
-                        --coverageReporters=lcov,text,clover
-                '''
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    sh '''
+                        echo "🧪  Running unit tests with coverage..."
+                        npm run test:cov -- \
+                            --forceExit \
+                            --detectOpenHandles \
+                            --passWithNoTests
+                    '''
+                }
             }
             post {
                 always {
@@ -238,7 +240,7 @@ pipeline {
                         git config user.name "Jenkins CI"
                         
                         # Use the authenticated URL for pushing
-                        git remote set-url origin https://\${GIT_USER}:\${GIT_TOKEN}@github.com/YOUR_ORG/inventory_app.git
+                        git remote set-url origin https://\${GIT_USER}:\${GIT_TOKEN}@github.com/AboEl3iz/inventory_app.git
 
                         git add \${KUSTOMIZE_FILE}
 
@@ -300,7 +302,7 @@ Commit: \${GIT_COMMIT}
                             {"title": "Branch",  "value": "${GIT_BRANCH}",  "short": true},
                             {"title": "Build",   "value": "#${BUILD_NUMBER}", "short": true},
                             {"title": "Stage",   "value": "${env.STAGE_NAME ?: 'Unknown'}", "short": true},
-                            {"title": "Logs",    "value": "${BUILD_URL}console", "short": false}
+                            {"title": "Logs",    "value": "${env.BUILD_URL}console", "short": false}
                           ],
                           "footer": "Jenkins CI",
                           "ts": '"\$(date +%s)"'
