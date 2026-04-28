@@ -54,7 +54,7 @@ pipeline {
                 script {
                     def shortSha = sh(returnStdout: true,
                                       script: 'git rev-parse --short HEAD').trim()
-                    env.IMAGE_TAG   = "${env.BUILD_NUMBER}-${shortSha}"
+                    env.IMAGE_TAG   = env.BUILD_NUMBER + '-' + shortSha
                     env.GIT_BRANCH  = sh(returnStdout: true,
                                          script: 'git rev-parse --abbrev-ref HEAD').trim()
                     env.COMMIT_MSG  = sh(returnStdout: true,
