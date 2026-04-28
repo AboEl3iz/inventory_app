@@ -33,7 +33,6 @@ pipeline {
 
         // IMAGE_TAG is set dynamically in Checkout stage:
         //   <BUILD_NUMBER>-<git-short-sha>  e.g. 42-a1b2c3d
-        IMAGE_TAG   = ''
 
         // ── SonarQube ────────────────────────────────────────────────────
         SONAR_PROJECT_KEY  = 'inventory-app'
@@ -56,7 +55,7 @@ pipeline {
                                       script: 'git rev-parse --short HEAD').trim()
                     env.IMAGE_TAG   = env.BUILD_NUMBER + '-' + shortSha
                     env.GIT_BRANCH  = sh(returnStdout: true,
-                                         script: 'git rev-parse --abbrev-ref HEAD').trim()
+                                         script: 'git rev-parse --abbrev-ref HEAD').trim().replaceFirst('^origin/', '')
                     env.COMMIT_MSG  = sh(returnStdout: true,
                                          script: 'git log -1 --pretty=%s').trim()
                     env.GIT_COMMIT  = sh(returnStdout: true,
