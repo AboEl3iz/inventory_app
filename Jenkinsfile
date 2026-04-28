@@ -119,8 +119,7 @@ pipeline {
                             sonar-scanner \
                               -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
                               -Dsonar.projectName="${SONAR_PROJECT_NAME}" \
-                              -Dsonar.login=${SONAR_AUTH_TOKEN} \
-                              -Dsonar.branch.name=${GIT_BRANCH}
+                              -Dsonar.login=${SONAR_AUTH_TOKEN}
                         '''
                     }
                 }
