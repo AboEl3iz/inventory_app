@@ -64,7 +64,14 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-# ── 5. Write token to shared volume ───────────────────────────────────────
+# ── 5. Configure Webhook ──────────────────────────────────────────────────
+echo "🪝   Configuring Jenkins Webhook in SonarQube..."
+curl -s -o /dev/null \
+  -X POST "${SONAR_URL}/api/webhooks/create" \
+  -u "admin:${SONAR_ADMIN_PASSWORD}" \
+  -d "name=Jenkins&url=http://jenkins:8080/sonarqube-webhook/" || true
+
+# ── 6. Write token to shared volume ───────────────────────────────────────
 echo "$TOKEN" > "$TOKEN_FILE"
 chmod 640 "$TOKEN_FILE"
 touch "$READY_FLAG"
