@@ -253,7 +253,7 @@ Build: #\${BUILD_NUMBER}
 Branch: \${GIT_BRANCH}
 Commit: \${GIT_COMMIT}
 [skip ci]"
-                            git push origin HEAD:\${GIT_BRANCH}
+                            git push origin HEAD:\${GIT_BRANCH#origin/}
                             echo "✅  GitOps manifest updated and pushed."
                         fi
                     """
