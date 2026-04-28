@@ -18,4 +18,4 @@ resources:
 # (even if it has ':latest' in the manifest) and replace its tag.
 images:
   - name: aboelaiz/inventory-app
-    newTag: "latest"
+    newTag: "9-731eda7"
