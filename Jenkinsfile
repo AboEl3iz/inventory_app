@@ -59,6 +59,8 @@ pipeline {
                                          script: 'git rev-parse --abbrev-ref HEAD').trim()
                     env.COMMIT_MSG  = sh(returnStdout: true,
                                          script: 'git log -1 --pretty=%s').trim()
+                    env.GIT_COMMIT  = sh(returnStdout: true,
+                                         script: 'git rev-parse HEAD').trim()
 
                     echo "📦  Image tag  : ${env.IMAGE_TAG}"
                     echo "🌿  Branch     : ${env.GIT_BRANCH}"
@@ -145,15 +147,15 @@ pipeline {
         stage('Docker Build') {
             steps {
                 sh """
-                    echo "🐳  Building Docker image: ${DOCKER_REPO}:${IMAGE_TAG}"
+                    echo "🐳  Building Docker image: ${env.DOCKER_REPO}:${env.IMAGE_TAG}"
                     docker build \\
-                      --label "build.number=${BUILD_NUMBER}" \\
-                      --label "git.commit=${GIT_COMMIT}" \\
-                      --label "git.branch=${GIT_BRANCH}" \\
+                      --label "build.number=${env.BUILD_NUMBER}" \\
+                      --label "git.commit=${env.GIT_COMMIT}" \\
+                      --label "git.branch=${env.GIT_BRANCH}" \\
                       --label "build.date=\$(date -u +%Y-%m-%dT%H:%M:%SZ)" \\
-                      -t ${DOCKER_REPO}:${IMAGE_TAG} \\
+                      -t ${env.DOCKER_REPO}:${env.IMAGE_TAG} \\
                       .
-                    echo "✅  Image built: ${DOCKER_REPO}:${IMAGE_TAG}"
+                    echo "✅  Image built: ${env.DOCKER_REPO}:${env.IMAGE_TAG}"
                 """
             }
         }
@@ -169,7 +171,7 @@ pipeline {
                       --no-progress \\
                       --format table \\
                       --output trivy-report.txt \\
-                      ${DOCKER_REPO}:${IMAGE_TAG}
+                      ${env.DOCKER_REPO}:${env.IMAGE_TAG}
 
                     echo "--- Trivy Summary ---"
                     cat trivy-report.txt
@@ -180,7 +182,7 @@ pipeline {
                       --severity CRITICAL \\
                       --no-progress \\
                       --quiet \\
-                      ${DOCKER_REPO}:${IMAGE_TAG}
+                      ${env.DOCKER_REPO}:${env.IMAGE_TAG}
 
                     echo "✅  No CRITICAL vulnerabilities found."
                 """
@@ -203,10 +205,10 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh """
-                        echo "📤  Pushing ${DOCKER_REPO}:${IMAGE_TAG} to DockerHub..."
+                        echo "📤  Pushing ${env.DOCKER_REPO}:${env.IMAGE_TAG} to DockerHub..."
                         echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
 
-                        docker push ${DOCKER_REPO}:${IMAGE_TAG}
+                        docker push ${env.DOCKER_REPO}:${env.IMAGE_TAG}
 
                         docker logout
                         echo "✅  Image pushed successfully."
@@ -272,12 +274,12 @@ Commit: \${GIT_COMMIT}
                       -d '{
                         "attachments": [{
                           "color": "#36a64f",
-                          "title": "✅ Pipeline SUCCEEDED — ${APP_NAME}",
+                          "title": "✅ Pipeline SUCCEEDED — ${env.APP_NAME}",
                           "fields": [
-                            {"title": "Branch",  "value": "${GIT_BRANCH}",  "short": true},
-                            {"title": "Build",   "value": "#${BUILD_NUMBER}", "short": true},
-                            {"title": "Image",   "value": "${DOCKER_REPO}:${IMAGE_TAG}", "short": false},
-                            {"title": "Commit",  "value": "${COMMIT_MSG}", "short": false}
+                            {"title": "Branch",  "value": "${env.GIT_BRANCH}",  "short": true},
+                            {"title": "Build",   "value": "#${env.BUILD_NUMBER}", "short": true},
+                            {"title": "Image",   "value": "${env.DOCKER_REPO}:${env.IMAGE_TAG}", "short": false},
+                            {"title": "Commit",  "value": "${env.COMMIT_MSG}", "short": false}
                           ],
                           "footer": "Jenkins CI",
                           "ts": '"\$(date +%s)"'
@@ -296,10 +298,10 @@ Commit: \${GIT_COMMIT}
                       -d '{
                         "attachments": [{
                           "color": "#cc0000",
-                          "title": "❌ Pipeline FAILED — ${APP_NAME}",
+                          "title": "❌ Pipeline FAILED — ${env.APP_NAME}",
                           "fields": [
-                            {"title": "Branch",  "value": "${GIT_BRANCH}",  "short": true},
-                            {"title": "Build",   "value": "#${BUILD_NUMBER}", "short": true},
+                            {"title": "Branch",  "value": "${env.GIT_BRANCH}",  "short": true},
+                            {"title": "Build",   "value": "#${env.BUILD_NUMBER}", "short": true},
                             {"title": "Stage",   "value": "${env.STAGE_NAME ?: 'Unknown'}", "short": true},
                             {"title": "Logs",    "value": "${env.BUILD_URL}console", "short": false}
                           ],
